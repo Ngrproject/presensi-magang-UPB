@@ -1,0 +1,21 @@
+{
+  "short_name": "E-Presensi UPB",
+  "name": "E-Presensi Magang UPB",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F8FAFC",
+  "theme_color": "#2563EB",
+  "display": "standalone",
+  "orientation": "portrait"
+}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
-  GraduationCap, LayoutDashboard, Camera, BookOpen, 
+  LayoutDashboard, Camera, BookOpen, 
   Settings, LogOut, Building2, User 
 } from 'lucide-react';
 import { BottomNav } from './BottomNav';
@@ -24,11 +24,13 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
-          {/* Logo & Brand: E-PRESENSI MAGANG UPB */}
+          {/* Logo & Brand: E-PRESENSI MAGANG UPB with Official UPB Emblem */}
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-2xl bg-gradient-to-tr from-blue-500 to-sky-400 text-amber-300 shadow-md shadow-blue-500/20">
-              <GraduationCap className="w-6 h-6" />
-            </div>
+            <img
+              src="/logo-upb.png"
+              alt="Logo Universitas Putra Bangsa"
+              className="w-10 h-10 object-contain drop-shadow-xs shrink-0"
+            />
             <div>
               <h1 className="text-base font-black tracking-tight text-blue-900">
                 E-PRESENSI MAGANG UPB

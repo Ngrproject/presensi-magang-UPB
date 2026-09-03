@@ -1,30 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { isFirebaseConfigured, db, serverTimestamp } from '../utils/firebase';
-import { calculateDistance, isWithinGeofence } from '../utils/haversine';
+import { isFirebaseConfigured, db } from '../utils/firebase';
+import { 
+  collection, doc, getDoc, setDoc, query, where, 
+  onSnapshot, getDocs, addDoc 
+} from 'firebase/firestore';
 
 const AppContext = createContext(null);
 
-// Default initial settings for demo/configured users
 const DEFAULT_SETTINGS = {
-  companyName: 'BMKG Stasiun Meteorologi Class I',
-  targetLat: -6.2088,
-  targetLon: 106.8456,
-  geofenceRadius: 50,
-  workHours: {
-    checkInStart: '08:00',
-    checkOutStart: '16:00'
-  },
-  workDays: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
-  startDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  durationMonths: 3,
-  endDate: new Date(Date.now() + 75 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  isLocked: false,
-  isConfigured: true // Demo accounts are pre-configured
-};
-
-// Initial settings for newly registered users (Requires mandatory initial setup!)
-const NEW_USER_SETTINGS = {
   companyName: '',
   targetLat: -6.2088,
   targetLon: 106.8456,
@@ -38,41 +22,12 @@ const NEW_USER_SETTINGS = {
   durationMonths: 3,
   endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   isLocked: false,
-  isConfigured: false // MANDATORY SETUP REQUIRED FOR NEW USERS!
+  isConfigured: false
 };
-
-// Sample logbooks for pre-configured demo
-const SAMPLE_LOGBOOKS = [
-  {
-    id: 'lb_sample_1',
-    dateStr: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    achievements: 'Mengimplementasikan komponen UI Glassmorphic dan pengujian modul Haversine GPS.',
-    obstacles: 'Sinyal GPS lemah di dalam ruangan laboratorium.',
-    tomorrowPlan: 'Melakukan deployment awal dan pengujian responsif pada perangkat seluler.',
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-// Sample presence log
-const SAMPLE_PRESENCE = [
-  {
-    id: 'pr_sample_1',
-    dateStr: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    checkInTime: '07:54:12',
-    checkOutTime: '16:05:44',
-    checkInPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-    checkOutPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-    checkInLocation: { lat: -6.20885, lon: 106.84562, distance: 8 },
-    checkOutLocation: { lat: -6.20882, lon: 106.84561, distance: 5 },
-    checkInStatus: 'TEPAT WAKTU',
-    checkOutStatus: 'SELESAI'
-  }
-];
 
 export function AppProvider({ children }) {
   const { currentUser } = useAuth();
   const userId = currentUser?.uid || 'guest';
-  const isNewUserSession = currentUser?.isNewUser || false;
 
   const settingsKey = `settings_${userId}`;
   const presenceKey = `presence_${userId}`;
@@ -81,20 +36,17 @@ export function AppProvider({ children }) {
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem(settingsKey);
-    if (saved) return JSON.parse(saved);
-    return isNewUserSession ? NEW_USER_SETTINGS : DEFAULT_SETTINGS;
+    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
   const [presenceLogs, setPresenceLogs] = useState(() => {
     const saved = localStorage.getItem(presenceKey);
-    if (saved) return JSON.parse(saved);
-    return isNewUserSession ? [] : SAMPLE_PRESENCE;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [logbooks, setLogbooks] = useState(() => {
     const saved = localStorage.getItem(logbooksKey);
-    if (saved) return JSON.parse(saved);
-    return isNewUserSession ? [] : SAMPLE_LOGBOOKS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [auditLogs, setAuditLogs] = useState(() => {
@@ -102,59 +54,88 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Reload user-isolated state whenever current user changes
+  // Real-time Firestore sync listeners
   useEffect(() => {
-    if (userId) {
-      const savedSet = localStorage.getItem(settingsKey);
-      if (savedSet) {
-        setSettings(JSON.parse(savedSet));
-      } else {
-        setSettings(currentUser?.isNewUser ? NEW_USER_SETTINGS : DEFAULT_SETTINGS);
-      }
-
-      const savedPres = localStorage.getItem(presenceKey);
-      if (savedPres) {
-        setPresenceLogs(JSON.parse(savedPres));
-      } else {
-        setPresenceLogs(currentUser?.isNewUser ? [] : SAMPLE_PRESENCE);
-      }
-
-      const savedLog = localStorage.getItem(logbooksKey);
-      if (savedLog) {
-        setLogbooks(JSON.parse(savedLog));
-      } else {
-        setLogbooks(currentUser?.isNewUser ? [] : SAMPLE_LOGBOOKS);
-      }
-
-      const savedAudit = localStorage.getItem(auditLogsKey);
-      setAuditLogs(savedAudit ? JSON.parse(savedAudit) : []);
+    if (!userId || userId === 'guest') {
+      setSettings(DEFAULT_SETTINGS);
+      setPresenceLogs([]);
+      setLogbooks([]);
+      setAuditLogs([]);
+      return;
     }
-  }, [userId, currentUser?.isNewUser]);
 
-  // Sync to local storage
-  useEffect(() => {
-    if (userId) {
-      localStorage.setItem(settingsKey, JSON.stringify(settings));
-    }
-  }, [settings, settingsKey, userId]);
+    // 1. Local storage fallback initial load
+    const savedSet = localStorage.getItem(settingsKey);
+    if (savedSet) setSettings(JSON.parse(savedSet));
 
-  useEffect(() => {
-    if (userId) {
-      localStorage.setItem(presenceKey, JSON.stringify(presenceLogs));
-    }
-  }, [presenceLogs, presenceKey, userId]);
+    const savedPres = localStorage.getItem(presenceKey);
+    if (savedPres) setPresenceLogs(JSON.parse(savedPres));
 
-  useEffect(() => {
-    if (userId) {
-      localStorage.setItem(logbooksKey, JSON.stringify(logbooks));
-    }
-  }, [logbooks, logbooksKey, userId]);
+    const savedLog = localStorage.getItem(logbooksKey);
+    if (savedLog) setLogbooks(JSON.parse(savedLog));
 
-  useEffect(() => {
-    if (userId) {
-      localStorage.setItem(auditLogsKey, JSON.stringify(auditLogs));
+    const savedAudit = localStorage.getItem(auditLogsKey);
+    if (savedAudit) setAuditLogs(JSON.parse(savedAudit));
+
+    // 2. Real-time Firebase Firestore Sync if connected
+    if (isFirebaseConfigured && db) {
+      // Sync settings
+      const settingsRef = doc(db, 'settings', userId);
+      const unsubSettings = onSnapshot(settingsRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setSettings(data);
+          localStorage.setItem(settingsKey, JSON.stringify(data));
+        }
+      }, (err) => console.log('Firestore settings listener info:', err));
+
+      // Sync presence logs
+      const presencesRef = collection(db, 'presences');
+      const qPres = query(presencesRef, where('userId', '==', userId));
+      const unsubPresences = onSnapshot(qPres, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setPresenceLogs(list);
+        localStorage.setItem(presenceKey, JSON.stringify(list));
+      }, (err) => console.log('Firestore presences listener info:', err));
+
+      // Sync logbooks
+      const logbooksRef = collection(db, 'logbooks');
+      const qLog = query(logbooksRef, where('userId', '==', userId));
+      const unsubLogbooks = onSnapshot(qLog, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setLogbooks(list);
+        localStorage.setItem(logbooksKey, JSON.stringify(list));
+      }, (err) => console.log('Firestore logbooks listener info:', err));
+
+      // Sync audit logs
+      const auditRef = collection(db, 'audit_logs');
+      const qAudit = query(auditRef, where('userId', '==', userId));
+      const unsubAudit = onSnapshot(qAudit, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        setAuditLogs(list);
+        localStorage.setItem(auditLogsKey, JSON.stringify(list));
+      }, (err) => console.log('Firestore audit listener info:', err));
+
+      return () => {
+        unsubSettings();
+        unsubPresences();
+        unsubLogbooks();
+        unsubAudit();
+      };
     }
-  }, [auditLogs, auditLogsKey, userId]);
+  }, [userId]);
 
   const getTodayStr = () => new Date().toISOString().split('T')[0];
 
@@ -168,34 +149,49 @@ export function AppProvider({ children }) {
     return logbooks.find((l) => l.dateStr === today) || null;
   };
 
-  // Method to update Internship Settings (Sets isConfigured: true)
-  const updateSettings = (newSettings, changeReason = 'Pembaruan durasi magang') => {
+  const updateSettings = async (newSettings, changeReason = 'Pembaruan durasi magang') => {
     const oldEndDate = settings.endDate;
     const isEndDateChanged = newSettings.endDate && newSettings.endDate !== oldEndDate;
 
-    if (isEndDateChanged && settings.isConfigured) {
-      const newAuditEntry = {
-        id: `audit_${Date.now()}`,
-        oldDate: oldEndDate,
-        newDate: newSettings.endDate,
-        timestamp: new Date().toISOString(),
-        reason: changeReason,
-        changedBy: currentUser?.name || 'Mahasiswa'
-      };
-      setAuditLogs((prev) => [newAuditEntry, ...prev]);
+    const updated = {
+      ...settings,
+      ...newSettings,
+      userId,
+      isConfigured: true,
+      targetLat: settings.isLocked ? settings.targetLat : (newSettings.targetLat ?? settings.targetLat),
+      targetLon: settings.isLocked ? settings.targetLon : (newSettings.targetLon ?? settings.targetLon),
+      startDate: settings.isLocked ? settings.startDate : (newSettings.startDate ?? settings.startDate)
+    };
+
+    setSettings(updated);
+    if (userId && userId !== 'guest') {
+      localStorage.setItem(settingsKey, JSON.stringify(updated));
     }
 
-    setSettings((prev) => ({
-      ...prev,
-      ...newSettings,
-      isConfigured: true, // Complete onboarding setup!
-      targetLat: prev.isLocked ? prev.targetLat : (newSettings.targetLat ?? prev.targetLat),
-      targetLon: prev.isLocked ? prev.targetLon : (newSettings.targetLon ?? prev.targetLon),
-      startDate: prev.isLocked ? prev.startDate : (newSettings.startDate ?? prev.startDate)
-    }));
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'settings', userId), updated, { merge: true });
+
+        if (isEndDateChanged && settings.isConfigured) {
+          const auditId = `audit_${Date.now()}`;
+          const newAuditEntry = {
+            id: auditId,
+            userId,
+            oldDate: oldEndDate,
+            newDate: newSettings.endDate,
+            timestamp: new Date().toISOString(),
+            reason: changeReason,
+            changedBy: currentUser?.name || 'Mahasiswa'
+          };
+          await setDoc(doc(db, 'audit_logs', auditId), newAuditEntry);
+        }
+      } catch (err) {
+        console.error("Firestore settings update error:", err);
+      }
+    }
   };
 
-  const addCheckIn = ({ photoDataUrl, userLat, userLon, distance }) => {
+  const addCheckIn = async ({ photoDataUrl, userLat, userLon, distance }) => {
     const todayStr = getTodayStr();
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
     
@@ -205,43 +201,52 @@ export function AppProvider({ children }) {
     const status = isLate ? 'TERLAMBAT' : 'TEPAT WAKTU';
 
     const existingToday = getTodayPresence();
+    const recordId = existingToday?.id || `pres_${userId}_${todayStr}`;
 
-    if (existingToday) {
-      setPresenceLogs((prev) =>
-        prev.map((item) =>
-          item.dateStr === todayStr
-            ? {
-                ...item,
-                checkInTime: nowTimeStr,
-                checkInPhoto: photoDataUrl,
-                checkInLocation: { lat: userLat, lon: userLon, distance },
-                checkInStatus: status
-              }
-            : item
-        )
-      );
-    } else {
-      const newRecord = {
-        id: `pres_${Date.now()}`,
-        dateStr: todayStr,
-        checkInTime: nowTimeStr,
-        checkOutTime: null,
-        checkInPhoto: photoDataUrl,
-        checkOutPhoto: null,
-        checkInLocation: { lat: userLat, lon: userLon, distance },
-        checkOutLocation: null,
-        checkInStatus: status,
-        checkOutStatus: null
-      };
-      setPresenceLogs((prev) => [newRecord, ...prev]);
-    }
+    const newRecord = {
+      id: recordId,
+      userId,
+      studentName: currentUser?.name || 'Mahasiswa',
+      studentId: currentUser?.studentId || '',
+      dateStr: todayStr,
+      checkInTime: nowTimeStr,
+      checkOutTime: existingToday?.checkOutTime || null,
+      checkInPhoto: photoDataUrl,
+      checkOutPhoto: existingToday?.checkOutPhoto || null,
+      checkInLocation: { lat: userLat, lon: userLon, distance },
+      checkOutLocation: existingToday?.checkOutLocation || null,
+      checkInStatus: status,
+      checkOutStatus: existingToday?.checkOutStatus || null
+    };
+
+    setPresenceLogs((prev) => {
+      const idx = prev.findIndex((p) => p.dateStr === todayStr);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = newRecord;
+        return copy;
+      }
+      return [newRecord, ...prev];
+    });
 
     if (!settings.isLocked) {
-      setSettings((prev) => ({ ...prev, isLocked: true }));
+      const lockUpdated = { ...settings, isLocked: true };
+      setSettings(lockUpdated);
+      if (isFirebaseConfigured && db && userId) {
+        setDoc(doc(db, 'settings', userId), lockUpdated, { merge: true }).catch(() => {});
+      }
+    }
+
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'presences', recordId), newRecord, { merge: true });
+      } catch (err) {
+        console.error("Firestore presences checkin error:", err);
+      }
     }
   };
 
-  const addCheckOut = ({ photoDataUrl, userLat, userLon, distance }) => {
+  const addCheckOut = async ({ photoDataUrl, userLat, userLon, distance }) => {
     const todayLogbook = getTodayLogbook();
     
     if (!todayLogbook || (!todayLogbook.achievements && !todayLogbook.obstacles)) {
@@ -250,51 +255,69 @@ export function AppProvider({ children }) {
 
     const todayStr = getTodayStr();
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
+    const existingToday = getTodayPresence();
+    const recordId = existingToday?.id || `pres_${userId}_${todayStr}`;
+
+    const updatedRecord = {
+      ...existingToday,
+      id: recordId,
+      userId,
+      studentName: currentUser?.name || 'Mahasiswa',
+      studentId: currentUser?.studentId || '',
+      dateStr: todayStr,
+      checkOutTime: nowTimeStr,
+      checkOutPhoto: photoDataUrl,
+      checkOutLocation: { lat: userLat, lon: userLon, distance },
+      checkOutStatus: 'SELESAI'
+    };
 
     setPresenceLogs((prev) =>
-      prev.map((item) =>
-        item.dateStr === todayStr
-          ? {
-              ...item,
-              checkOutTime: nowTimeStr,
-              checkOutPhoto: photoDataUrl,
-              checkOutLocation: { lat: userLat, lon: userLon, distance },
-              checkOutStatus: 'SELESAI'
-            }
-          : item
-        )
-      );
+      prev.map((item) => (item.dateStr === todayStr ? updatedRecord : item))
+    );
+
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'presences', recordId), updatedRecord, { merge: true });
+      } catch (err) {
+        console.error("Firestore presences checkout error:", err);
+      }
+    }
   };
 
-  const saveLogbook = ({ achievements, obstacles, tomorrowPlan, dateStr = getTodayStr() }) => {
+  const saveLogbook = async ({ achievements, obstacles, tomorrowPlan, dateStr = getTodayStr() }) => {
     const existing = logbooks.find((l) => l.dateStr === dateStr);
+    const logId = existing?.id || `log_${userId}_${dateStr}`;
     const nowIso = new Date().toISOString();
 
-    if (existing) {
-      setLogbooks((prev) =>
-        prev.map((item) =>
-          item.dateStr === dateStr
-            ? {
-                ...item,
-                achievements,
-                obstacles,
-                tomorrowPlan,
-                updatedAt: nowIso
-              }
-            : item
-        )
-      );
-    } else {
-      const newEntry = {
-        id: `log_${Date.now()}`,
-        dateStr,
-        achievements,
-        obstacles,
-        tomorrowPlan,
-        createdAt: nowIso,
-        updatedAt: nowIso
-      };
-      setLogbooks((prev) => [newEntry, ...prev]);
+    const logEntry = {
+      id: logId,
+      userId,
+      studentName: currentUser?.name || 'Mahasiswa',
+      studentId: currentUser?.studentId || '',
+      dateStr,
+      achievements,
+      obstacles,
+      tomorrowPlan,
+      updatedAt: nowIso,
+      createdAt: existing?.createdAt || nowIso
+    };
+
+    setLogbooks((prev) => {
+      const idx = prev.findIndex((l) => l.dateStr === dateStr);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = logEntry;
+        return copy;
+      }
+      return [logEntry, ...prev];
+    });
+
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'logbooks', logId), logEntry, { merge: true });
+      } catch (err) {
+        console.error("Firestore save logbook error:", err);
+      }
     }
   };
 

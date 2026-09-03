@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { 
   UserCheck, GraduationCap, Building2, Mail, 
-  Save, Check, ShieldCheck, Camera, Image, Upload, Trash2 
+  Save, Check, ShieldCheck, Camera, Image as ImageIcon, Upload 
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -29,13 +29,14 @@ export function ProfilePage() {
   const [savedAlert, setSavedAlert] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Compress & convert device image file to clean lightweight Data URL
+  // Compress & convert device image file with fail-proof error handling
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       alert('Mohon pilih file gambar (JPG, PNG, WebP).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -43,36 +44,70 @@ export function ProfilePage() {
     const reader = new FileReader();
 
     reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 400;
-        const MAX_HEIGHT = 400;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
+      try {
+        const rawDataUrl = event.target?.result;
+        if (!rawDataUrl) {
+          setIsUploading(false);
+          return;
         }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+        const img = new window.Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 400;
+            const MAX_HEIGHT = 400;
+            let width = img.width || 300;
+            let height = img.height || 300;
 
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        setAvatarUrl(compressedDataUrl);
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = Math.floor(width);
+            canvas.height = Math.floor(height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            setAvatarUrl(compressedDataUrl);
+          } catch (canvasErr) {
+            console.error("Canvas compression error, using raw image:", canvasErr);
+            setAvatarUrl(rawDataUrl);
+          } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+        };
+
+        img.onerror = (imgErr) => {
+          console.error("Image decode error, fallback to raw image:", imgErr);
+          setAvatarUrl(rawDataUrl);
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+
+        img.src = rawDataUrl;
+      } catch (err) {
+        console.error("FileReader onload processing error:", err);
         setIsUploading(false);
-      };
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+
+    reader.onerror = (readErr) => {
+      console.error("FileReader error:", readErr);
+      alert('Gagal membaca file gambar dari perangkat.');
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     reader.readAsDataURL(file);
@@ -154,8 +189,9 @@ export function ProfilePage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
                 title="Unggah Foto dari HP/Device"
-                className="absolute bottom-1 right-1 p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md border-2 border-white transition transform active:scale-90 flex items-center justify-center"
+                className="absolute bottom-1 right-1 p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md border-2 border-white transition transform active:scale-90 flex items-center justify-center disabled:opacity-50"
               >
                 <Camera className="w-4 h-4" />
               </button>
@@ -170,8 +206,9 @@ export function ProfilePage() {
             {/* Device Upload Quick Button */}
             <button
               type="button"
+              disabled={isUploading}
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-2xl border border-blue-200 flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-2xl border border-blue-200 flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               <Upload className="w-4 h-4 text-blue-600" />
               <span>{isUploading ? 'Memproses Foto...' : 'Upload Foto dari Perangkat (HP)'}</span>
@@ -217,8 +254,9 @@ export function ProfilePage() {
                 </div>
                 <button
                   type="button"
+                  disabled={isUploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs border border-blue-400 transition"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs border border-blue-400 transition disabled:opacity-50"
                 >
                   {isUploading ? 'Mengunggah...' : 'Pilih Foto File'}
                 </button>
@@ -228,7 +266,7 @@ export function ProfilePage() {
             {/* Avatar Selector Presets */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Image className="w-4 h-4 text-blue-500" />
+                <ImageIcon className="w-4 h-4 text-blue-500" />
                 Atau Pilih Preset Avatar Mahasiswa
               </label>
               <div className="grid grid-cols-6 gap-2">

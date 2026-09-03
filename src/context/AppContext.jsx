@@ -36,7 +36,15 @@ export function AppProvider({ children }) {
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem(settingsKey);
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      workHours: {
+        checkInStart: parsed?.workHours?.checkInStart || '08:00',
+        checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
+      }
+    };
   });
 
   const [presenceLogs, setPresenceLogs] = useState(() => {
@@ -64,9 +72,18 @@ export function AppProvider({ children }) {
       return;
     }
 
-    // 1. Local storage fallback initial load
     const savedSet = localStorage.getItem(settingsKey);
-    if (savedSet) setSettings(JSON.parse(savedSet));
+    if (savedSet) {
+      const parsed = JSON.parse(savedSet);
+      setSettings({
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        workHours: {
+          checkInStart: parsed?.workHours?.checkInStart || '08:00',
+          checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
+        }
+      });
+    }
 
     const savedPres = localStorage.getItem(presenceKey);
     if (savedPres) setPresenceLogs(JSON.parse(savedPres));
@@ -77,19 +94,24 @@ export function AppProvider({ children }) {
     const savedAudit = localStorage.getItem(auditLogsKey);
     if (savedAudit) setAuditLogs(JSON.parse(savedAudit));
 
-    // 2. Real-time Firebase Firestore Sync if connected
     if (isFirebaseConfigured && db) {
-      // Sync settings
       const settingsRef = doc(db, 'settings', userId);
       const unsubSettings = onSnapshot(settingsRef, (snap) => {
         if (snap.exists()) {
           const data = snap.data();
-          setSettings(data);
-          localStorage.setItem(settingsKey, JSON.stringify(data));
+          const merged = {
+            ...DEFAULT_SETTINGS,
+            ...data,
+            workHours: {
+              checkInStart: data?.workHours?.checkInStart || '08:00',
+              checkOutStart: data?.workHours?.checkOutStart || '16:00'
+            }
+          };
+          setSettings(merged);
+          localStorage.setItem(settingsKey, JSON.stringify(merged));
         }
       }, (err) => console.log('Firestore settings listener info:', err));
 
-      // Sync presence logs
       const presencesRef = collection(db, 'presences');
       const qPres = query(presencesRef, where('userId', '==', userId));
       const unsubPresences = onSnapshot(qPres, (snap) => {
@@ -102,7 +124,6 @@ export function AppProvider({ children }) {
         localStorage.setItem(presenceKey, JSON.stringify(list));
       }, (err) => console.log('Firestore presences listener info:', err));
 
-      // Sync logbooks
       const logbooksRef = collection(db, 'logbooks');
       const qLog = query(logbooksRef, where('userId', '==', userId));
       const unsubLogbooks = onSnapshot(qLog, (snap) => {
@@ -115,7 +136,6 @@ export function AppProvider({ children }) {
         localStorage.setItem(logbooksKey, JSON.stringify(list));
       }, (err) => console.log('Firestore logbooks listener info:', err));
 
-      // Sync audit logs
       const auditRef = collection(db, 'audit_logs');
       const qAudit = query(auditRef, where('userId', '==', userId));
       const unsubAudit = onSnapshot(qAudit, (snap) => {
@@ -156,6 +176,10 @@ export function AppProvider({ children }) {
     const updated = {
       ...settings,
       ...newSettings,
+      workHours: {
+        checkInStart: newSettings.workHours?.checkInStart || settings.workHours?.checkInStart || '08:00',
+        checkOutStart: newSettings.workHours?.checkOutStart || settings.workHours?.checkOutStart || '16:00'
+      },
       userId,
       isConfigured: true,
       targetLat: settings.isLocked ? settings.targetLat : (newSettings.targetLat ?? settings.targetLat),
@@ -247,10 +271,25 @@ export function AppProvider({ children }) {
   };
 
   const addCheckOut = async ({ photoDataUrl, userLat, userLon, distance }) => {
+    // 1. Guardrail: Daily Logbook required
     const todayLogbook = getTodayLogbook();
-    
     if (!todayLogbook || (!todayLogbook.achievements && !todayLogbook.obstacles)) {
       throw new Error('GUARDRAIL_LOGBOOK_REQUIRED');
+    }
+
+    // 2. Guardrail: Must be AFTER configured checkOutStart work hour (Default: 16:00)
+    const rawCheckOutStr = settings.workHours?.checkOutStart;
+    const reqTimeString = (rawCheckOutStr && String(rawCheckOutStr).trim()) ? String(rawCheckOutStr).trim() : '16:00';
+    const parts = reqTimeString.split(':');
+    const reqHour = parseInt(parts[0], 10) || 16;
+    const reqMin = parseInt(parts[1], 10) || 0;
+
+    const now = new Date();
+    const nowMinTotal = now.getHours() * 60 + now.getMinutes();
+    const reqMinTotal = reqHour * 60 + reqMin;
+
+    if (nowMinTotal < reqMinTotal) {
+      throw new Error(`GUARDRAIL_EARLY_CHECKOUT:${reqTimeString}`);
     }
 
     const todayStr = getTodayStr();

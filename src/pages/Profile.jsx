@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { 
   UserCheck, GraduationCap, Building2, Mail, 
-  Save, Check, ShieldCheck, Camera, Image, Key 
+  Save, Check, ShieldCheck, Camera, Image, Upload, Trash2 
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -19,6 +19,7 @@ const AVATAR_PRESETS = [
 export function ProfilePage() {
   const { currentUser, updateUserProfile } = useAuth();
   const { settings } = useApp();
+  const fileInputRef = useRef(null);
 
   const [name, setName] = useState(currentUser?.name || '');
   const [studentId, setStudentId] = useState(currentUser?.studentId || '');
@@ -26,8 +27,58 @@ export function ProfilePage() {
   const [university, setUniversity] = useState(currentUser?.university || 'Universitas Putra Bangsa (UPB)');
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || AVATAR_PRESETS[0]);
   const [savedAlert, setSavedAlert] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Compress & convert device image file to clean lightweight Data URL
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih file gambar (JPG, PNG, WebP).');
+      return;
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setAvatarUrl(compressedDataUrl);
+        setIsUploading(false);
+      };
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -39,7 +90,7 @@ export function ProfilePage() {
       return;
     }
 
-    updateUserProfile({
+    await updateUserProfile({
       name,
       studentId,
       email,
@@ -61,6 +112,15 @@ export function ProfilePage() {
   return (
     <div className="space-y-6">
       
+      {/* Hidden Device File Picker Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 via-sky-600 to-blue-600 bg-clip-text text-transparent">
@@ -84,16 +144,21 @@ export function ProfilePage() {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 text-center space-y-4">
             
-            {/* Avatar Preview */}
-            <div className="relative inline-block">
+            {/* Avatar Preview & Upload Overlay Button */}
+            <div className="relative inline-block group">
               <img
                 src={avatarUrl}
                 alt={name}
-                className="w-28 h-28 rounded-3xl object-cover border-4 border-blue-500 shadow-md mx-auto"
+                className="w-32 h-32 rounded-3xl object-cover border-4 border-blue-500 shadow-md mx-auto"
               />
-              <span className="absolute bottom-0 right-0 p-2 bg-blue-500 text-white rounded-xl shadow-xs border border-white">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Unggah Foto dari HP/Device"
+                className="absolute bottom-1 right-1 p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md border-2 border-white transition transform active:scale-90 flex items-center justify-center"
+              >
                 <Camera className="w-4 h-4" />
-              </span>
+              </button>
             </div>
 
             <div>
@@ -102,13 +167,23 @@ export function ProfilePage() {
               <p className="text-xs text-slate-500 font-medium mt-1">{university}</p>
             </div>
 
+            {/* Device Upload Quick Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-2xl border border-blue-200 flex items-center justify-center gap-2 transition"
+            >
+              <Upload className="w-4 h-4 text-blue-600" />
+              <span>{isUploading ? 'Memproses Foto...' : 'Upload Foto dari Perangkat (HP)'}</span>
+            </button>
+
             {/* Instansi Badge */}
-            <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-xs space-y-1 text-left">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1 text-left">
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                 Instansi Magang Aktif
               </span>
               <p className="font-bold text-blue-900 truncate">
-                {settings.companyName || 'BMKG Stasiun Meteorologi'}
+                {settings.companyName || 'Belum dikonfigurasi'}
               </p>
             </div>
 
@@ -130,11 +205,31 @@ export function ProfilePage() {
               Formulir Edit Data Mahasiswa
             </h2>
 
+            {/* Section: Upload Device Photo */}
+            <div className="p-4 rounded-3xl bg-blue-50/70 border border-blue-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-blue-600" />
+                    Foto Profil dari Galeri / Kamera HP
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Pilih foto pribadi langsung dari penyimpanan perangkat Anda</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs border border-blue-400 transition"
+                >
+                  {isUploading ? 'Mengunggah...' : 'Pilih Foto File'}
+                </button>
+              </div>
+            </div>
+
             {/* Avatar Selector Presets */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <Image className="w-4 h-4 text-blue-500" />
-                Pilih Foto Profil (Preset Avatar)
+                Atau Pilih Preset Avatar Mahasiswa
               </label>
               <div className="grid grid-cols-6 gap-2">
                 {AVATAR_PRESETS.map((preset, idx) => (
@@ -154,7 +249,7 @@ export function ProfilePage() {
 
             {/* Custom Avatar URL Field */}
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Atau Gunakan Custom Image URL</label>
+              <label className="block text-xs text-slate-500 mb-1">Custom Image URL (Opsional)</label>
               <input
                 type="url"
                 value={avatarUrl}
@@ -205,7 +300,7 @@ export function ProfilePage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="budi@students.upb.ac.id"
+                placeholder="nama@students.upb.ac.id"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
               />
             </div>

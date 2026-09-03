@@ -3,8 +3,11 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
 import { 
   Building2, MapPin, Lock, Unlock, Clock, Calendar, 
-  RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info 
+  RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info, 
+  Layers, Sun, Moon, Sunrise, CalendarDays
 } from 'lucide-react';
+
+const ALL_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 export function SettingsPage({ setActiveTab }) {
   const { settings, updateSettings, auditLogs } = useApp();
@@ -13,8 +16,36 @@ export function SettingsPage({ setActiveTab }) {
   const [targetLat, setTargetLat] = useState(settings.targetLat ?? -6.2088);
   const [targetLon, setTargetLon] = useState(settings.targetLon ?? 106.8456);
   const [geofenceRadius, setGeofenceRadius] = useState(settings.geofenceRadius || 50);
+  
+  // Work Mode & Shifts
+  const [scheduleMode, setScheduleMode] = useState(settings.scheduleMode || 'REGULER');
+  const [selectedShift, setSelectedShift] = useState(settings.selectedShift || 'SHIFT_1');
+  const [shifts, setShifts] = useState(settings.shifts || {
+    SHIFT_1: { name: 'Shift 1 (Pagi)', start: '07:00', end: '15:00' },
+    SHIFT_2: { name: 'Shift 2 (Siang)', start: '15:00', end: '23:00' },
+    SHIFT_3: { name: 'Shift 3 (Malam)', start: '23:00', end: '07:00' }
+  });
+
+  // Regular Hours
   const [checkInStart, setCheckInStart] = useState(settings.workHours?.checkInStart || '08:00');
   const [checkOutStart, setCheckOutStart] = useState(settings.workHours?.checkOutStart || '16:00');
+  
+  // Custom Work Days & Off-Days
+  const [workDays, setWorkDays] = useState(settings.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
+  
+  // Custom Per-Day Hours
+  const [useCustomDailyHours, setUseCustomDailyHours] = useState(settings.useCustomDailyHours || false);
+  const [dailyHours, setDailyHours] = useState(settings.dailyHours || {
+    Senin: { start: '08:00', end: '16:00' },
+    Selasa: { start: '08:00', end: '16:00' },
+    Rabu: { start: '08:00', end: '16:00' },
+    Kamis: { start: '08:00', end: '16:00' },
+    Jumat: { start: '08:00', end: '14:00' },
+    Sabtu: { start: '08:00', end: '12:00' },
+    Minggu: { start: '08:00', end: '12:00' }
+  });
+
+  // Period & Duration
   const [startDate, setStartDate] = useState(settings.startDate || new Date().toISOString().split('T')[0]);
   const [durationMonths, setDurationMonths] = useState(settings.durationMonths || 3);
   const [customEndDate, setCustomEndDate] = useState(settings.endDate || '2026-11-01');
@@ -44,7 +75,7 @@ export function SettingsPage({ setActiveTab }) {
           console.error("GPS Error:", err);
           if (err.message?.includes('Only secure origins') || (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
             alert(
-              '🔒 AKSES GPS OTOMATIS DIBATASI (HTTP IP)\n\nBrowser HP membatasi tombol GPS otomatis hanya pada koneksi HTTPS (Vercel / Ngrok) atau localhost.\n\nTips: Anda dapat langsung memasukkan angka Latitude & Longitude kantor Anda secara manual pada kolom input di bawah ini!'
+              '🔒 AKSES GPS OTOMATIS DIBATASI (HTTP IP)\n\nBrowser HP membatasi Geolocation otomatis hanya pada koneksi HTTPS (Vercel / Ngrok) atau localhost.\n\nTips: Anda dapat langsung memasukkan angka Latitude & Longitude kantor Anda secara manual pada kolom input di bawah ini!'
             );
           } else {
             alert('Gagal mengambil koordinat lokasi: ' + err.message);
@@ -57,6 +88,32 @@ export function SettingsPage({ setActiveTab }) {
       alert('Browser tidak mendukung Geolocation.');
       setIsGrabbingGps(false);
     }
+  };
+
+  const handleToggleDay = (day) => {
+    setWorkDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const handleShiftTimeChange = (shiftKey, field, val) => {
+    setShifts((prev) => ({
+      ...prev,
+      [shiftKey]: {
+        ...prev[shiftKey],
+        [field]: val
+      }
+    }));
+  };
+
+  const handleDailyHourChange = (day, field, val) => {
+    setDailyHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...(prev[day] || { start: '08:00', end: '16:00' }),
+        [field]: val
+      }
+    }));
   };
 
   const computeEndDate = (start, months) => {
@@ -76,16 +133,27 @@ export function SettingsPage({ setActiveTab }) {
       return;
     }
 
+    if (workDays.length === 0) {
+      alert('Mohon pilih setidaknya 1 hari kerja.');
+      return;
+    }
+
     updateSettings(
       {
         companyName,
         targetLat: Number(targetLat),
         targetLon: Number(targetLon),
         geofenceRadius: Number(geofenceRadius),
+        scheduleMode,
+        selectedShift,
+        shifts,
         workHours: {
           checkInStart,
           checkOutStart
         },
+        workDays,
+        useCustomDailyHours,
+        dailyHours,
         startDate,
         durationMonths: Number(durationMonths),
         endDate: computedEnd
@@ -127,7 +195,7 @@ export function SettingsPage({ setActiveTab }) {
             </div>
           </div>
           <p className="text-xs text-blue-50 leading-relaxed font-medium">
-            Akun Anda baru saja terdaftar. Mohon lengkapi **Konfigurasi Instansi Magang** Anda di bawah ini (Nama Perusahaan, Koordinat GPS Kantor, Radius Geofence, & Tanggal Period) untuk mengaktifkan seluruh fitur Presensi Kamera & Daily Logbook.
+            Akun Anda baru saja terdaftar. Mohon lengkapi **Konfigurasi Instansi Magang** Anda di bawah ini (Nama Perusahaan, Koordinat GPS Kantor, Schedule Mode & Hari Kerja) untuk mengaktifkan seluruh fitur Presensi Kamera & Daily Logbook.
           </p>
         </div>
       )}
@@ -137,7 +205,7 @@ export function SettingsPage({ setActiveTab }) {
         <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 via-sky-600 to-blue-600 bg-clip-text text-transparent">
           KONFIGURASI INSTANSI
         </h1>
-        <p className="text-xs text-slate-500 font-medium">Pengaturan Lokasi Kantor, Radius Geofence & Period Magang</p>
+        <p className="text-xs text-slate-500 font-medium">Pengaturan Lokasi Kantor, Mode Shift, Custom Hari Libur & Jam Kerja</p>
       </div>
 
       {/* Lock Status Alert Banner */}
@@ -185,7 +253,7 @@ export function SettingsPage({ setActiveTab }) {
         {/* Main Settings Form */}
         <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-5">
           
-          {/* Section 1: Company Profile */}
+          {/* Section 1: Perusahaan Profile */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
             <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Building2 className="w-5 h-5 text-blue-500" />
@@ -205,7 +273,151 @@ export function SettingsPage({ setActiveTab }) {
             </div>
           </div>
 
-          {/* Section 2: Target Coords & Geofence Radius */}
+          {/* Section 2: Mode Kerja & Shift Selection (NEW FEATURE) */}
+          <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
+            <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Layers className="w-5 h-5 text-amber-500" />
+              Mode Kerja (Reguler vs Shift 1, 2, 3)
+            </h2>
+
+            {/* Mode Switcher */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setScheduleMode('REGULER')}
+                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${
+                  scheduleMode === 'REGULER'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span className="text-xs font-black flex items-center gap-1.5">
+                  💼 Jam Reguler (Non-Shift)
+                </span>
+                <span className={`text-[10px] ${scheduleMode === 'REGULER' ? 'text-blue-100' : 'text-slate-500'}`}>
+                  Jam masuk & pulang tetap harian
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setScheduleMode('SHIFT')}
+                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${
+                  scheduleMode === 'SHIFT'
+                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md font-bold'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span className="text-xs font-black flex items-center gap-1.5">
+                  🔄 Mode Shift (1, 2, 3)
+                </span>
+                <span className={`text-[10px] ${scheduleMode === 'SHIFT' ? 'text-slate-900' : 'text-slate-500'}`}>
+                  Sistem shift bergantian
+                </span>
+              </button>
+            </div>
+
+            {/* Shift Inputs & Active Shift Selection */}
+            {scheduleMode === 'SHIFT' && (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-4">
+                <label className="block text-xs font-bold text-amber-900">
+                  Pilih Shift Aktif Mahasiswa & Input Jam Manual:
+                </label>
+
+                {/* Shift Selector Radio Pills */}
+                <div className="grid grid-cols-3 gap-2">
+                  {['SHIFT_1', 'SHIFT_2', 'SHIFT_3'].map((sKey) => {
+                    const isSelected = selectedShift === sKey;
+                    return (
+                      <button
+                        key={sKey}
+                        type="button"
+                        onClick={() => setSelectedShift(sKey)}
+                        className={`p-3 rounded-xl border text-center text-xs font-bold transition ${
+                          isSelected
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-md'
+                            : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100/50'
+                        }`}
+                      >
+                        {shifts[sKey]?.name || sKey}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Manual Time Editors for Shift 1, Shift 2, Shift 3 */}
+                <div className="space-y-3 pt-2 border-t border-amber-200/60 font-mono text-xs">
+                  {['SHIFT_1', 'SHIFT_2', 'SHIFT_3'].map((sKey) => (
+                    <div key={sKey} className="p-3 bg-white rounded-xl border border-amber-200 space-y-2">
+                      <span className="font-bold text-slate-900 block font-sans">
+                        {shifts[sKey]?.name}:
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-500 block">Jam Masuk</label>
+                          <input
+                            type="time"
+                            value={shifts[sKey]?.start || '08:00'}
+                            onChange={(e) => handleShiftTimeChange(sKey, 'start', e.target.value)}
+                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block">Jam Pulang</label>
+                          <input
+                            type="time"
+                            value={shifts[sKey]?.end || '16:00'}
+                            onChange={(e) => handleShiftTimeChange(sKey, 'end', e.target.value)}
+                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Custom Hari Kerja & Custom Hari Libur (NEW FEATURE) */}
+          <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
+            <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <CalendarDays className="w-5 h-5 text-blue-500" />
+              Custom Hari Kerja & Custom Hari Libur
+            </h2>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-700">
+                Pilih Hari Kerja Magang (Centang = Hari Kerja, Tidak Dicentang = Hari Libur) *
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {ALL_DAYS.map((day) => {
+                  const isWorkDay = workDays.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => handleToggleDay(day)}
+                      className={`p-3 rounded-2xl border text-center text-xs font-bold transition flex items-center justify-between ${
+                        isWorkDay
+                          ? 'bg-blue-50 text-blue-900 border-blue-300'
+                          : 'bg-red-50 text-red-800 border-red-200 opacity-70'
+                      }`}
+                    >
+                      <span>{day}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        isWorkDay ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
+                      }`}>
+                        {isWorkDay ? 'KERJA' : 'LIBUR'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Target Coords & Geofence Radius */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2">
@@ -282,39 +494,90 @@ export function SettingsPage({ setActiveTab }) {
             </div>
           </div>
 
-          {/* Section 3: Work Hours */}
+          {/* Section 5: Jam Kerja & Custom Jam Per Hari (NEW FEATURE) */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
             <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Clock className="w-5 h-5 text-blue-500" />
-              Jam Kerja Magang
+              Konfigurasi Jam Kerja (Reguler & Custom Per Hari)
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Jam Masuk (Batas Normal)</label>
-                <input
-                  type="time"
-                  required
-                  value={checkInStart}
-                  onChange={(e) => setCheckInStart(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white font-bold"
-                />
-              </div>
+            {/* Standard Regular Hours */}
+            {scheduleMode === 'REGULER' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Jam Masuk (Batas Normal)</label>
+                  <input
+                    type="time"
+                    required
+                    value={checkInStart}
+                    onChange={(e) => setCheckInStart(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white font-bold"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Jam Minimal Pulang</label>
-                <input
-                  type="time"
-                  required
-                  value={checkOutStart}
-                  onChange={(e) => setCheckOutStart(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white font-bold"
-                />
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Jam Minimal Pulang</label>
+                  <input
+                    type="time"
+                    required
+                    value={checkOutStart}
+                    onChange={(e) => setCheckOutStart(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white font-bold"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Custom Per-Day Hours Toggle & Input Table */}
+            {scheduleMode === 'REGULER' && (
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="customDailyHours"
+                    checked={useCustomDailyHours}
+                    onChange={(e) => setUseCustomDailyHours(e.target.checked)}
+                    className="rounded accent-blue-600"
+                  />
+                  <label htmlFor="customDailyHours" className="text-xs font-bold text-slate-800">
+                    Gunakan Custom Jam Per Hari (Misal: Senin-Kamis 08:00-16:00, Jumat 08:00-14:00)
+                  </label>
+                </div>
+
+                {useCustomDailyHours && (
+                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-3 font-mono text-xs">
+                    <span className="font-bold text-blue-900 block font-sans">
+                      Input Manual Jam Kerja Spesifik Per Hari:
+                    </span>
+                    <div className="space-y-2">
+                      {workDays.map((day) => (
+                        <div key={day} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-blue-200">
+                          <span className="w-20 font-bold text-slate-900 font-sans">{day}:</span>
+                          <div className="flex items-center gap-2 flex-1">
+                            <input
+                              type="time"
+                              value={dailyHours[day]?.start || '08:00'}
+                              onChange={(e) => handleDailyHourChange(day, 'start', e.target.value)}
+                              className="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold"
+                            />
+                            <span>s.d.</span>
+                            <input
+                              type="time"
+                              value={dailyHours[day]?.end || '16:00'}
+                              onChange={(e) => handleDailyHourChange(day, 'end', e.target.value)}
+                              className="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Section 4: Flexible Duration Picker */}
+          {/* Section 6: Flexible Duration Picker */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
             <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Calendar className="w-5 h-5 text-blue-500" />

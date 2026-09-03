@@ -13,9 +13,26 @@ const DEFAULT_SETTINGS = {
   targetLat: -6.2088,
   targetLon: 106.8456,
   geofenceRadius: 50,
+  scheduleMode: 'REGULER', // 'REGULER' | 'SHIFT'
+  selectedShift: 'SHIFT_1',
+  shifts: {
+    SHIFT_1: { name: 'Shift 1 (Pagi)', start: '07:00', end: '15:00' },
+    SHIFT_2: { name: 'Shift 2 (Siang)', start: '15:00', end: '23:00' },
+    SHIFT_3: { name: 'Shift 3 (Malam)', start: '23:00', end: '07:00' }
+  },
   workHours: {
     checkInStart: '08:00',
     checkOutStart: '16:00'
+  },
+  useCustomDailyHours: false,
+  dailyHours: {
+    Senin: { start: '08:00', end: '16:00' },
+    Selasa: { start: '08:00', end: '16:00' },
+    Rabu: { start: '08:00', end: '16:00' },
+    Kamis: { start: '08:00', end: '16:00' },
+    Jumat: { start: '08:00', end: '14:00' },
+    Sabtu: { start: '08:00', end: '12:00' },
+    Minggu: { start: '08:00', end: '12:00' }
   },
   workDays: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
   startDate: new Date().toISOString().split('T')[0],
@@ -40,6 +57,14 @@ export function AppProvider({ children }) {
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      shifts: {
+        ...DEFAULT_SETTINGS.shifts,
+        ...(parsed?.shifts || {})
+      },
+      dailyHours: {
+        ...DEFAULT_SETTINGS.dailyHours,
+        ...(parsed?.dailyHours || {})
+      },
       workHours: {
         checkInStart: parsed?.workHours?.checkInStart || '08:00',
         checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
@@ -78,6 +103,14 @@ export function AppProvider({ children }) {
       setSettings({
         ...DEFAULT_SETTINGS,
         ...parsed,
+        shifts: {
+          ...DEFAULT_SETTINGS.shifts,
+          ...(parsed?.shifts || {})
+        },
+        dailyHours: {
+          ...DEFAULT_SETTINGS.dailyHours,
+          ...(parsed?.dailyHours || {})
+        },
         workHours: {
           checkInStart: parsed?.workHours?.checkInStart || '08:00',
           checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
@@ -102,6 +135,14 @@ export function AppProvider({ children }) {
           const merged = {
             ...DEFAULT_SETTINGS,
             ...data,
+            shifts: {
+              ...DEFAULT_SETTINGS.shifts,
+              ...(data?.shifts || {})
+            },
+            dailyHours: {
+              ...DEFAULT_SETTINGS.dailyHours,
+              ...(data?.dailyHours || {})
+            },
             workHours: {
               checkInStart: data?.workHours?.checkInStart || '08:00',
               checkOutStart: data?.workHours?.checkOutStart || '16:00'
@@ -169,6 +210,30 @@ export function AppProvider({ children }) {
     return logbooks.find((l) => l.dateStr === today) || null;
   };
 
+  const getYesterdayLogbook = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterdayStr = d.toISOString().split('T')[0];
+    return logbooks.find((l) => l.dateStr === yesterdayStr) || null;
+  };
+
+  // Dynamically resolve today's required check-out time based on mode/shift/custom daily hours
+  const getTodayRequiredCheckOutStr = () => {
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const todayName = dayNames[new Date().getDay()];
+
+    if (settings.scheduleMode === 'SHIFT') {
+      const shiftObj = settings.shifts?.[settings.selectedShift];
+      return shiftObj?.end || '16:00';
+    }
+
+    if (settings.useCustomDailyHours && settings.dailyHours?.[todayName]) {
+      return settings.dailyHours[todayName].end || '16:00';
+    }
+
+    return settings.workHours?.checkOutStart || '16:00';
+  };
+
   const updateSettings = async (newSettings, changeReason = 'Pembaruan durasi magang') => {
     const oldEndDate = settings.endDate;
     const isEndDateChanged = newSettings.endDate && newSettings.endDate !== oldEndDate;
@@ -219,7 +284,17 @@ export function AppProvider({ children }) {
     const todayStr = getTodayStr();
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
     
-    const [reqHour, reqMin] = (settings.workHours?.checkInStart || '08:00').split(':').map(Number);
+    // Resolve start time for late calculation
+    let reqCheckInStr = settings.workHours?.checkInStart || '08:00';
+    if (settings.scheduleMode === 'SHIFT') {
+      reqCheckInStr = settings.shifts?.[settings.selectedShift]?.start || '07:00';
+    } else if (settings.useCustomDailyHours) {
+      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const todayName = dayNames[new Date().getDay()];
+      reqCheckInStr = settings.dailyHours?.[todayName]?.start || '08:00';
+    }
+
+    const [reqHour, reqMin] = reqCheckInStr.split(':').map(Number);
     const now = new Date();
     const isLate = now.getHours() > reqHour || (now.getHours() === reqHour && now.getMinutes() > reqMin);
     const status = isLate ? 'TERLAMBAT' : 'TEPAT WAKTU';
@@ -277,9 +352,8 @@ export function AppProvider({ children }) {
       throw new Error('GUARDRAIL_LOGBOOK_REQUIRED');
     }
 
-    // 2. Guardrail: Must be AFTER configured checkOutStart work hour (Default: 16:00)
-    const rawCheckOutStr = settings.workHours?.checkOutStart;
-    const reqTimeString = (rawCheckOutStr && String(rawCheckOutStr).trim()) ? String(rawCheckOutStr).trim() : '16:00';
+    // 2. Guardrail: Must be AFTER required check-out time
+    const reqTimeString = getTodayRequiredCheckOutStr();
     const parts = reqTimeString.split(':');
     const reqHour = parseInt(parts[0], 10) || 16;
     const reqMin = parseInt(parts[1], 10) || 0;
@@ -319,6 +393,46 @@ export function AppProvider({ children }) {
         await setDoc(doc(db, 'presences', recordId), updatedRecord, { merge: true });
       } catch (err) {
         console.error("Firestore presences checkout error:", err);
+      }
+    }
+  };
+
+  // Submit Leave / Ketidakhadiran Record (SAKIT, IZIN, LIBUR NASIONAL, LIBUR INSTANSI)
+  const addLeaveRecord = async ({ leaveType, reason, proofDataUrl, dateStr = getTodayStr() }) => {
+    const recordId = `leave_${userId}_${dateStr}`;
+
+    const leaveRecord = {
+      id: recordId,
+      userId,
+      studentName: currentUser?.name || 'Mahasiswa',
+      studentId: currentUser?.studentId || '',
+      dateStr,
+      isLeave: true,
+      leaveType,
+      checkInTime: `IZIN (${leaveType})`,
+      checkOutTime: `IZIN (${leaveType})`,
+      checkInStatus: leaveType,
+      checkOutStatus: leaveType,
+      reason,
+      proofPhoto: proofDataUrl || null,
+      submittedAt: new Date().toISOString()
+    };
+
+    setPresenceLogs((prev) => {
+      const idx = prev.findIndex((p) => p.dateStr === dateStr);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = leaveRecord;
+        return copy;
+      }
+      return [leaveRecord, ...prev];
+    });
+
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'presences', recordId), leaveRecord, { merge: true });
+      } catch (err) {
+        console.error("Firestore leave record save error:", err);
       }
     }
   };
@@ -370,9 +484,12 @@ export function AppProvider({ children }) {
         auditLogs,
         getTodayPresence,
         getTodayLogbook,
+        getYesterdayLogbook,
+        getTodayRequiredCheckOutStr,
         getTodayStr,
         addCheckIn,
         addCheckOut,
+        addLeaveRecord,
         saveLogbook
       }}
     >

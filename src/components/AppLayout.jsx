@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, Camera, BookOpen, 
-  Settings, LogOut, Building2, User 
+  Settings, LogOut, Building2, User, FileText
 } from 'lucide-react';
 import { BottomNav } from './BottomNav';
 
@@ -13,6 +13,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'presence', label: 'Presensi', icon: Camera },
     { id: 'logbook', label: 'Logbook', icon: BookOpen },
+    { id: 'reports', label: 'Laporan', icon: FileText },
     { id: 'settings', label: 'Konfigurasi Instansi', icon: Settings },
     { id: 'profile', label: 'Profil Saya', icon: User }
   ];
@@ -21,7 +22,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-500 selection:text-white relative">
       
       {/* Top Professional Header Navbar */}
-      <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
           {/* Logo & Brand: E-PRESENSI MAGANG UPB with Official UPB Emblem */}
@@ -51,7 +52,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                       isActive
                         ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
                         : 'text-slate-600 hover:text-blue-700 hover:bg-slate-200/60'
@@ -106,13 +107,13 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
       </header>
 
       {/* Main Content Area with Bottom Padding for Mobile Nav */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-8 print:p-0 print:m-0 print:max-w-none">
         {children}
       </main>
 
       {/* Mobile Floating Bottom Navigation (Fixed at bottom on viewport < 768px) */}
       {currentUser && (
-        <div className="md:hidden">
+        <div className="md:hidden print:hidden">
           <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
       )}

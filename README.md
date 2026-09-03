@@ -1,5 +1,5 @@
 # 🎓 E-Presensi Magang UPB (PWA)
-> **Sistem Portal Presensi Kamera Selfie, Geofencing GPS & Daily Logbook Mahasiswa Universitas Putra Bangsa (UPB)**
+> **Sistem Portal Presensi Kamera Selfie, Geofencing GPS, Form Pengajuan Izin & Daily Logbook Mahasiswa Universitas Putra Bangsa (UPB)**
 
 ![E-Presensi Magang UPB](https://img.shields.io/badge/UNIVERSITAS_PUTRA_BANGSA-UPB-blue?style=for-the-badge&logo=graduation-cap)
 ![React Vite](https://img.shields.io/badge/React_18-Vite-sky?style=for-the-badge&logo=react)
@@ -12,7 +12,7 @@
 
 **E-Presensi Magang UPB** adalah aplikasi *Single Page Application* (SPA) berstandar **Progressive Web App (PWA)** yang dirancang khusus untuk mahasiswa **Universitas Putra Bangsa (UPB)** yang sedang melaksanakan program Magang / Praktik Kerja Lapangan (PKL).
 
-Aplikasi ini mengintegrasikan **Anti-Fraud Live Camera Selfie**, **Geofencing GPS jarak akurat (Formula Haversine)**, **Work End Time Check-Out Guardrail (Presensi Pulang HANYA setelah jam pulang)**, **Guardrail Daily Logbook**, **Duration Audit Logs**, serta **Cloud Real-time Sync** ke Google Firebase Firestore.
+Aplikasi ini mengintegrasikan **Anti-Fraud Live Camera Selfie**, **Geofencing GPS jarak akurat (Formula Haversine)**, **Form Pengajuan Ketidakhadiran (Sakit, Izin, Libur)**, **Kalkulasi Otomatis Status Alpha**, **Work End Time Check-Out Guardrail**, **Guardrail Daily Logbook**, **Duration Audit Logs**, serta **Cloud Real-time Sync** ke Google Firebase Firestore.
 
 ---
 
@@ -25,31 +25,30 @@ Aplikasi ini mengintegrasikan **Anti-Fraud Live Camera Selfie**, **Geofencing GP
 
 ### 📷 2. Anti-Fraud Live Camera Viewfinder
 - Membuka aliran video kamera depan HP/perangkat secara langsung (`facingMode: "user"`).
-- Tidak menyediakan tombol upload foto dari galeri pada saat presensi untuk mencegah kecurangan/titip presensi.
+- Kamera terintegrasi secara langsung (*direct embedded*) di dalam kartu presensi.
 
-### 🌐 3. GPS Geofencing (Formula Haversine Real-time)
+### 📝 3. Form Pengajuan Izin / Ketidakhadiran
+- Tab khusus pengajuan ketidakhadiran tanpa kamera selfie untuk kategori:
+  1. 🤒 **SAKIT**: Sakit dengan/tanpa lampiran surat dokter.
+  2. ✉️ **IZIN**: Izin kepentingan pribadi/akademik.
+  3. 🇮🇩 **LIBUR NASIONAL**: Hari libur kalender nasional resmi.
+  4. 🏢 **LIBUR INSTANSI**: Libur internal kantor instansi magang.
+- Mendukung unggah foto/lampiran berkas bukti langsung dari perangkat HP/Laptop.
+
+### 📊 4. Rekapitulasi Otomatis Status ALPHA & Kehadiran
+- Dashboard menampilkan statistik rekapitulasi kehadiran lengkap: **Hadir**, **Sakit**, **Izin**, **Libur**, dan **Alpha** (Kalkulasi otomatis hari kerja magang yang terlewat tanpa presensi/izin).
+
+### 🌐 5. GPS Geofencing (Formula Haversine Real-time)
 - Menghitung jarak fisik presisi antara koordinat GPS HP mahasiswa dan koordinat target instansi magang:
   $$d = 2R \times \arcsin\left(\sqrt{\sin^2(\Delta\phi/2) + \cos(\phi_1)\cos(\phi_2)\sin^2(\Delta\lambda/2)}\right)$$
-- Tombol **Submit Presensi** terkunci otomatis jika mahasiswa berada di luar radius kantor (misal: > 50 meter).
 
-### ⏰ 4. Work End Time Check-Out Guardrail
+### ⏰ 6. Work End Time Check-Out Guardrail
 - Presensi Pulang **DILINDUNGI & DIKUNCI** secara otomatis oleh sistem sebelum jam kerja pulang yang telah dikonfigurasi (Default: **Pukul 16:00 WIB**).
-- Jika mahasiswa mencoba Presensi Pulang sebelum jam tersebut (misal: pukul 10.47 WIB), tombol akan terkunci dan menampilkan notifikasi peringatan:
-  `"BELUM WAKTU PULANG: Presensi Pulang hanya dapat dilakukan setelah jam kerja selesai (Pukul 16:00 WIB)."`
 
-### 🔒 5. Logbook Check-Out Guardrail
+### 🔒 7. Logbook Check-Out Guardrail
 - Mahasiswa **WAJIB** mengisi & menyimpan kegiatan harian (*Daily Logbook*) hari ini terlebih dahulu sebelum diizinkan melakukan **Presensi Pulang**.
 
-### 🏢 6. Konfigurasi Instansi & Audit Logs
-- Pengaturan Nama Instansi, Koordinat GPS Target, Radius Geofence, Jam Kerja, dan Periode Magang.
-- **Locking Mechanism**: Koordinat & tanggal mulai terkunci otomatis permanen setelah check-in pertama tercatat.
-- Perubahan tanggal selesai dicatat ke dalam `duration_audit_logs`.
-
-### 🚀 7. Mandatory Onboarding Setup
-- Pendaftaran akun baru (`isNewUser: true`) secara otomatis mengarahkan mahasiswa ke **Langkah Awal Konfigurasi Instansi Magang** sebelum mengaktifkan akses penuh ke Dashboard.
-
 ### 👤 8. Profil Mahasiswa & Device Photo Upload
-- Mengelola data mahasiswa (Nama, NIM, Email, Perguruan Tinggi).
 - Pengunggah foto profil pribadi langsung dari penyimpanan perangkat HP/Laptop dengan kompresi otomatis Canvas (400x400) yang aman dari *infinite loading*.
 
 ---
@@ -64,13 +63,11 @@ Aplikasi ini mengintegrasikan **Anti-Fraud Live Camera Selfie**, **Geofencing GP
 | **Database Cloud** | Firebase Firestore | Database NoSQL cloud real-time terpusat |
 | **Authentication** | Firebase Auth | Autentikasi akun mahasiswa terenkripsi |
 | **Storage Fallback** | LocalStorage | Mode penyimpanan lokal terisolasi |
-| **Animations** | Canvas Confetti | Efek perayaan pergerakan sukses |
 
 ---
 
 ## 💻 4. PANDUAN JALANKAN SECARA LOKAL
 
-### Langkah-Langkah:
 ```bash
 npm install
 npm run build

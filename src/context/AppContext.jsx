@@ -474,13 +474,184 @@ export function AppProvider({ children }) {
     }
   };
 
+  const [allPresenceLogs, setAllPresenceLogs] = useState(() => {
+    const saved = localStorage.getItem('all_presence_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [allLogbooks, setAllLogbooks] = useState(() => {
+    const saved = localStorage.getItem('all_logbooks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Real-time Firestore sync listeners for admin views
+  useEffect(() => {
+    if (isFirebaseConfigured && db) {
+      const presencesRef = collection(db, 'presences');
+      const unsubAllPres = onSnapshot(presencesRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setAllPresenceLogs(list);
+        localStorage.setItem('all_presence_logs', JSON.stringify(list));
+      }, (err) => console.log('Firestore all presences listener info:', err));
+
+      const logbooksRef = collection(db, 'logbooks');
+      const unsubAllLogs = onSnapshot(logbooksRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setAllLogbooks(list);
+        localStorage.setItem('all_logbooks', JSON.stringify(list));
+      }, (err) => console.log('Firestore all logbooks listener info:', err));
+
+      return () => {
+        unsubAllPres();
+        unsubAllLogs();
+      };
+    }
+  }, []);
+
+  const adminUnlockStudentSettings = async (targetUserId) => {
+    if (!targetUserId) return;
+
+    if (targetUserId === userId) {
+      const updated = { ...settings, isLocked: false };
+      setSettings(updated);
+      localStorage.setItem(settingsKey, JSON.stringify(updated));
+    }
+
+    // Also update target user's settings in localStorage for local fallback
+    const targetSettingsKey = `settings_${targetUserId}`;
+    const savedTarget = localStorage.getItem(targetSettingsKey);
+    if (savedTarget) {
+      const parsed = JSON.parse(savedTarget);
+      localStorage.setItem(targetSettingsKey, JSON.stringify({ ...parsed, isLocked: false }));
+    }
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'settings', targetUserId), { isLocked: false }, { merge: true });
+      } catch (err) {
+        console.error("Firestore adminUnlockStudentSettings error:", err);
+      }
+    }
+  };
+
+  const adminSavePresence = async (presenceData) => {
+    const targetUserId = presenceData.userId;
+    const dateStr = presenceData.dateStr || getTodayStr();
+    const recordId = presenceData.id || `pres_${targetUserId}_${dateStr}`;
+
+    let status = presenceData.checkInStatus || 'TEPAT WAKTU';
+    if (status === 'HADIR TEPAT WAKTU' || status === 'HADIR') {
+      status = 'TEPAT WAKTU';
+    }
+
+    const newRecord = {
+      id: recordId,
+      userId: targetUserId,
+      studentName: presenceData.studentName || 'Mahasiswa',
+      studentId: presenceData.studentId || '',
+      dateStr,
+      checkInTime: presenceData.checkInTime || '08:00',
+      checkOutTime: presenceData.checkOutTime || '16:00',
+      checkInStatus: status,
+      checkOutStatus: presenceData.checkOutStatus || 'SELESAI',
+      notes: presenceData.notes || '',
+      isLeave: Boolean(presenceData.isLeave),
+      leaveType: presenceData.leaveType || null,
+      reason: presenceData.reason || null,
+      adminOverride: true,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update target student's individual presence list in localStorage
+    const targetPresenceKey = `presence_${targetUserId}`;
+    const savedTargetPresences = localStorage.getItem(targetPresenceKey);
+    let targetList = savedTargetPresences ? JSON.parse(savedTargetPresences) : [];
+    const tIdx = targetList.findIndex((p) => p.dateStr === dateStr);
+    if (tIdx >= 0) {
+      targetList[tIdx] = newRecord;
+    } else {
+      targetList.unshift(newRecord);
+    }
+    targetList.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+    localStorage.setItem(targetPresenceKey, JSON.stringify(targetList));
+
+    // If currently logged-in user IS the target student, update active presenceLogs state
+    if (targetUserId === userId) {
+      setPresenceLogs(targetList);
+    }
+
+    // Update global presence logs list for admin views
+    setAllPresenceLogs((prev) => {
+      const idx = prev.findIndex((p) => p.id === recordId);
+      let updated;
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = newRecord;
+      } else {
+        updated = [newRecord, ...prev];
+      }
+      localStorage.setItem('all_presence_logs', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'presences', recordId), newRecord, { merge: true });
+      } catch (err) {
+        console.error("Firestore adminSavePresence error:", err);
+      }
+    }
+  };
+
+  const adminDeletePresence = async (recordId) => {
+    // Find record to identify targetUserId
+    const targetRecord = allPresenceLogs.find(p => p.id === recordId) || presenceLogs.find(p => p.id === recordId);
+    if (targetRecord?.userId) {
+      const targetPresenceKey = `presence_${targetRecord.userId}`;
+      const savedTargetPresences = localStorage.getItem(targetPresenceKey);
+      if (savedTargetPresences) {
+        const targetList = JSON.parse(savedTargetPresences).filter(p => p.id !== recordId);
+        localStorage.setItem(targetPresenceKey, JSON.stringify(targetList));
+        if (targetRecord.userId === userId) {
+          setPresenceLogs(targetList);
+        }
+      }
+    }
+
+    setPresenceLogs((prev) => prev.filter((p) => p.id !== recordId));
+    setAllPresenceLogs((prev) => {
+      const updated = prev.filter((p) => p.id !== recordId);
+      localStorage.setItem('all_presence_logs', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const { deleteDoc: deleteFsDoc } = await import('firebase/firestore');
+        await deleteFsDoc(doc(db, 'presences', recordId));
+      } catch (err) {
+        console.error("Firestore adminDeletePresence error:", err);
+      }
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
         settings,
         updateSettings,
         presenceLogs,
+        allPresenceLogs,
         logbooks,
+        allLogbooks,
         auditLogs,
         getTodayPresence,
         getTodayLogbook,
@@ -490,7 +661,10 @@ export function AppProvider({ children }) {
         addCheckIn,
         addCheckOut,
         addLeaveRecord,
-        saveLogbook
+        saveLogbook,
+        adminUnlockStudentSettings,
+        adminSavePresence,
+        adminDeletePresence
       }}
     >
       {children}

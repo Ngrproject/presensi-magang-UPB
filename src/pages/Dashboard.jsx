@@ -34,7 +34,7 @@ export function DashboardPage({ setActiveTab }) {
 
   // Compute Statistics Breakdown safely
   const logs = Array.isArray(presenceLogs) ? presenceLogs : [];
-  const hadirCount = logs.filter((p) => p && !p.isLeave && (p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'TERLAMBAT')).length;
+  const hadirCount = logs.filter((p) => p && !p.isLeave && (p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'HADIR TEPAT WAKTU' || p.checkInStatus === 'HADIR' || p.checkInStatus === 'TERLAMBAT')).length;
   const sakitCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'SAKIT').length;
   const izinCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'IZIN').length;
   const liburCount = logs.filter((p) => p && p.isLeave && (p.leaveType === 'LIBUR NASIONAL' || p.leaveType === 'LIBUR INSTANSI')).length;
@@ -81,13 +81,13 @@ export function DashboardPage({ setActiveTab }) {
           return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800">IZIN</span>;
       }
     }
-    if (log.checkInStatus === 'TEPAT WAKTU') {
+    if (log.checkInStatus === 'TEPAT WAKTU' || log.checkInStatus === 'HADIR TEPAT WAKTU' || log.checkInStatus === 'HADIR') {
       return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">TEPAT WAKTU</span>;
     }
     if (log.checkInStatus === 'TERLAMBAT') {
       return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">TERLAMBAT</span>;
     }
-    return null;
+    return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">{log.checkInStatus || 'HADIR'}</span>;
   };
 
   return (

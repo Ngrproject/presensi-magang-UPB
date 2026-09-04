@@ -9,6 +9,7 @@ import { LogbookPage } from './pages/Logbook';
 import { ReportPage } from './pages/Report';
 import { SettingsPage } from './pages/Settings';
 import { ProfilePage } from './pages/Profile';
+import { AdminPage } from './pages/Admin';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -58,17 +59,17 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { currentUser } = useAuth();
   const { settings } = useApp();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => currentUser?.role === 'admin' ? 'admin' : 'dashboard');
 
-  // Enforce mandatory settings setup on first login/registration
+  // Enforce mandatory settings setup on first login/registration for students
   useEffect(() => {
-    if (currentUser && !settings.isConfigured) {
+    if (currentUser && currentUser.role !== 'admin' && !settings.isConfigured) {
       setActiveTab('settings');
     }
   }, [currentUser, settings.isConfigured]);
 
   const handleTabChange = (tabId) => {
-    if (currentUser && !settings.isConfigured && tabId !== 'settings') {
+    if (currentUser && currentUser.role !== 'admin' && !settings.isConfigured && tabId !== 'settings') {
       alert('MANDATORY SETUP: Mohon isi dan simpan Konfigurasi Instansi Magang Anda terlebih dahulu!');
       return;
     }
@@ -85,6 +86,7 @@ function AppContent() {
 
   return (
     <AppLayout activeTab={activeTab} setActiveTab={handleTabChange}>
+      {activeTab === 'admin' && <AdminPage />}
       {activeTab === 'dashboard' && <DashboardPage setActiveTab={handleTabChange} />}
       {activeTab === 'presence' && <PresencePage setActiveTab={handleTabChange} />}
       {activeTab === 'logbook' && <LogbookPage />}

@@ -80,7 +80,7 @@ export function ReportPage() {
           if (p.leaveType === 'SAKIT') sakit++;
           else if (p.leaveType === 'IZIN') izin++;
           else if (p.leaveType === 'LIBUR NASIONAL' || p.leaveType === 'LIBUR INSTANSI') libur++;
-        } else if (p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'TERLAMBAT') {
+        } else if (p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'HADIR TEPAT WAKTU' || p.checkInStatus === 'HADIR' || p.checkInStatus === 'TERLAMBAT') {
           hadir++;
         }
       }

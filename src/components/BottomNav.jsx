@@ -1,7 +1,11 @@
 import React from 'react';
-import { LayoutDashboard, Camera, BookOpen, Settings, User, FileText } from 'lucide-react';
+import { LayoutDashboard, Camera, BookOpen, Settings, User, FileText, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export function BottomNav({ activeTab, setActiveTab }) {
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'presence', label: 'Presensi', icon: Camera },
@@ -10,6 +14,10 @@ export function BottomNav({ activeTab, setActiveTab }) {
     { id: 'settings', label: 'Instansi', icon: Settings },
     { id: 'profile', label: 'Profil', icon: User }
   ];
+
+  if (isAdmin) {
+    navItems.unshift({ id: 'admin', label: 'Admin', icon: ShieldCheck });
+  }
 
   return (
     <div className="fixed bottom-4 left-2 right-2 max-w-lg mx-auto z-50">

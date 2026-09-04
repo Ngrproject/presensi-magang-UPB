@@ -111,7 +111,7 @@ export function AuthPage() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {isRegisterMode ? 'Nomor Induk Mahasiswa (NIM UPB) *' : 'NIM / Email Student UPB'}
+              {isRegisterMode ? 'Nomor Induk Mahasiswa (NIM UPB) *' : 'NIM / Email Student UPB *'}
             </label>
             <div className="relative">
               <input
@@ -119,11 +119,16 @@ export function AuthPage() {
                 required
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                placeholder="Isi NIM Mahasiswa"
+                placeholder={isRegisterMode ? "Contoh: 2021001234" : "Masukkan NIM (cth: 2021001234) atau Email"}
                 className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white font-mono transition"
               />
               <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
             </div>
+            {!isRegisterMode && (
+              <p className="text-[11px] text-slate-500 mt-1 pl-1 font-medium">
+                💡 Masuk menggunakan <span className="font-semibold text-blue-700">NIM</span> atau <span className="font-semibold text-blue-700">Email</span> terdaftar.
+              </p>
+            )}
           </div>
 
           {isRegisterMode && (

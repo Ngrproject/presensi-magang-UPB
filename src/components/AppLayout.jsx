@@ -2,12 +2,13 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, Camera, BookOpen, 
-  Settings, LogOut, Building2, User, FileText
+  Settings, LogOut, Building2, User, FileText, ShieldCheck
 } from 'lucide-react';
 import { BottomNav } from './BottomNav';
 
 export function AppLayout({ children, activeTab, setActiveTab }) {
   const { currentUser, logout } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -17,6 +18,10 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
     { id: 'settings', label: 'Konfigurasi Instansi', icon: Settings },
     { id: 'profile', label: 'Profil Saya', icon: User }
   ];
+
+  if (isAdmin) {
+    navItems.unshift({ id: 'admin', label: 'Panel Admin', icon: ShieldCheck });
+  }
 
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-500 selection:text-white relative">

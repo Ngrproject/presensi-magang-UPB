@@ -130,6 +130,7 @@ export function ProfilePage() {
       studentId,
       email,
       university,
+      role,
       avatarUrl
     });
 
@@ -357,6 +358,22 @@ export function ProfilePage() {
                 placeholder="Universitas Putra Bangsa (UPB)"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition font-medium"
               />
+            </div>
+
+            {/* Role Akun */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                Role Akun Aplikasi
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500 focus:bg-white transition"
+              >
+                <option value="student">Mahasiswa (Student)</option>
+                <option value="admin">Administrator / Koordinator (Admin)</option>
+              </select>
             </div>
 
             {/* Submit Button */}

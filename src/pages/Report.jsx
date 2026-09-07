@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { 
-  FileText, Download, Calendar, Filter, 
-  CheckCircle2, Clock, Building2, UserCheck, 
+import {
+  FileText, Download, Calendar, Filter,
+  CheckCircle2, Clock, Building2, UserCheck,
   Stethoscope, Mail, Flag, ShieldAlert, Printer
 } from 'lucide-react';
 
@@ -102,7 +102,7 @@ export function ReportPage() {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header & Print Filter Controls (Hidden when printing) */}
       <div className="print:hidden space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -126,38 +126,34 @@ export function ReportPage() {
 
         {/* Filter Bar */}
         <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          
+
           {/* Report Type Selector Tabs */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 overflow-x-auto">
             <button
               onClick={() => setReportType('harian')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                reportType === 'harian' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${reportType === 'harian' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
+                }`}
             >
               📅 Harian
             </button>
             <button
               onClick={() => setReportType('mingguan')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                reportType === 'mingguan' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${reportType === 'mingguan' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
+                }`}
             >
               🗓️ Mingguan
             </button>
             <button
               onClick={() => setReportType('bulanan')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                reportType === 'bulanan' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${reportType === 'bulanan' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
+                }`}
             >
               📆 Bulanan
             </button>
             <button
               onClick={() => setReportType('akumulasi')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                reportType === 'akumulasi' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${reportType === 'akumulasi' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-slate-200'
+                }`}
             >
               📈 Selama Ini (Akumulasi)
             </button>
@@ -197,7 +193,7 @@ export function ReportPage() {
 
       {/* PRINTABLE OFFICIAL PDF CONTAINER */}
       <div className="bg-white border border-slate-200 shadow-md rounded-3xl p-6 sm:p-10 print:border-none print:shadow-none print:p-0 print:m-0 space-y-6">
-        
+
         {/* OFFICIAL KOP SURAT HEADER UPB */}
         <div className="border-b-4 border-double border-blue-900 pb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -350,7 +346,7 @@ export function ReportPage() {
 
         {/* OFFICIAL 3-PARTY SIGNATURE BLOCK */}
         <div className="pt-8 grid grid-cols-3 gap-4 text-center text-xs text-slate-900 border-t border-slate-200 print:pt-12">
-          
+
           {/* Pembimbing Lapangan Instansi */}
           <div className="space-y-16">
             <div>

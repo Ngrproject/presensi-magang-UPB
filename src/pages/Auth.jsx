@@ -27,7 +27,7 @@ export function AuthPage() {
 
   return (
     <div className="w-full min-h-[80vh] flex flex-col justify-center items-center py-8">
-      
+
       {/* App Logo & Header with Official UPB Gold Emblem */}
       <div className="text-center mb-6 max-w-md w-full">
         <div className="inline-flex p-3 rounded-3xl bg-white border border-slate-200 shadow-md mb-3">
@@ -47,7 +47,7 @@ export function AuthPage() {
 
       {/* Responsive Centered White Card */}
       <div className="w-full max-w-md bg-white border border-blue-100 shadow-xl rounded-3xl p-6 sm:p-8 relative overflow-hidden">
-        
+
         {/* Card Top Pill */}
         <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
           <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">

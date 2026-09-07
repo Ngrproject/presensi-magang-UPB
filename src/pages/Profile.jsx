@@ -2,9 +2,9 @@ import React, { useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { 
-  UserCheck, GraduationCap, Building2, Mail, 
-  Save, Check, ShieldCheck, Camera, Image as ImageIcon, Upload 
+import {
+  UserCheck, GraduationCap, Building2, Mail,
+  Save, Check, ShieldCheck, Camera, Image as ImageIcon, Upload
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -25,6 +25,7 @@ export function ProfilePage() {
   const [studentId, setStudentId] = useState(currentUser?.studentId || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [university, setUniversity] = useState(currentUser?.university || 'Universitas Putra Bangsa (UPB)');
+  const [role, setRole] = useState(currentUser?.role || 'student');
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || AVATAR_PRESETS[0]);
   const [savedAlert, setSavedAlert] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -121,7 +122,7 @@ export function ProfilePage() {
       return;
     }
     if (!studentId.trim()) {
-      alert('NIM tidak boleh kosong.');
+      alert('NIM / NIDN tidak boleh kosong.');
       return;
     }
 
@@ -135,19 +136,23 @@ export function ProfilePage() {
     });
 
     setSavedAlert(true);
-    
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.5 }
-    });
+
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.5 }
+      });
+    } catch (cErr) {
+      console.warn("Confetti effect info:", cErr);
+    }
 
     setTimeout(() => setSavedAlert(false), 3000);
   };
 
   return (
-    <div className="space-y-6">
-      
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
+
       {/* Hidden Device File Picker Input */}
       <input
         type="file"
@@ -160,26 +165,26 @@ export function ProfilePage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 via-sky-600 to-blue-600 bg-clip-text text-transparent">
-          PROFIL MAHASISWA
+          PROFIL SAYA
         </h1>
-        <p className="text-xs text-slate-500 font-medium">Kelola & Perbarui Informasi Identitas Diri Mahasiswa UPB</p>
+        <p className="text-xs text-slate-500 font-medium">Kelola & Perbarui Informasi Identitas Diri Akun UPB</p>
       </div>
 
       {/* Save Success Alert */}
       {savedAlert && (
         <div className="p-4 rounded-3xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2 shadow-xs animate-fade-in">
           <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>Profil Mahasiswa Berhasil Diperbarui!</span>
+          <span>Profil Akun Berhasil Diperbarui!</span>
         </div>
       )}
 
       {/* Grid Layout: Desktop 2-Column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Column: Student ID Card Preview */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 text-center space-y-4">
-            
+
             {/* Avatar Preview & Upload Overlay Button */}
             <div className="relative inline-block group">
               <img
@@ -199,8 +204,10 @@ export function ProfilePage() {
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-slate-900">{name || 'Nama Mahasiswa'}</h2>
-              <p className="text-xs font-mono font-bold text-blue-600">NIM: {studentId || '210101234'}</p>
+              <h2 className="text-lg font-bold text-slate-900">{name || 'Nama User'}</h2>
+              <p className="text-xs font-mono font-bold text-blue-600">
+                {role === 'lecturer' ? 'NIDN' : 'NIM'}: {studentId || '-'}
+              </p>
               <p className="text-xs text-slate-500 font-medium mt-1">{university}</p>
             </div>
 
@@ -212,23 +219,25 @@ export function ProfilePage() {
               className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-2xl border border-blue-200 flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               <Upload className="w-4 h-4 text-blue-600" />
-              <span>{isUploading ? 'Memproses Foto...' : 'Upload Foto dari Perangkat (HP)'}</span>
+              <span>{isUploading ? 'Memproses Foto...' : 'Upload Foto dari HP / Perangkat'}</span>
             </button>
 
             {/* Instansi Badge */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1 text-left">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
-                Instansi Magang Aktif
-              </span>
-              <p className="font-bold text-blue-900 truncate">
-                {settings.companyName || 'Belum dikonfigurasi'}
-              </p>
-            </div>
+            {role === 'student' && (
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1 text-left">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                  Instansi Magang Aktif
+                </span>
+                <p className="font-bold text-blue-900 truncate">
+                  {settings.companyName || 'Belum dikonfigurasi'}
+                </p>
+              </div>
+            )}
 
             {/* Portal Badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Status: Akun Mahasiswa Terverifikasi UPB
+              Status: Akun Terverifikasi UPB
             </div>
 
           </div>
@@ -237,10 +246,10 @@ export function ProfilePage() {
         {/* Right Column: Edit Profile Form */}
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-5">
-            
+
             <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
               <UserCheck className="w-5 h-5 text-blue-500" />
-              Formulir Edit Data Mahasiswa
+              Formulir Edit Data Akun
             </h2>
 
             {/* Section: Upload Device Photo */}
@@ -268,7 +277,7 @@ export function ProfilePage() {
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <ImageIcon className="w-4 h-4 text-blue-500" />
-                Atau Pilih Preset Avatar Mahasiswa
+                Atau Pilih Preset Avatar
               </label>
               <div className="grid grid-cols-6 gap-2">
                 {AVATAR_PRESETS.map((preset, idx) => (
@@ -276,9 +285,8 @@ export function ProfilePage() {
                     key={idx}
                     type="button"
                     onClick={() => setAvatarUrl(preset)}
-                    className={`rounded-2xl overflow-hidden border-2 transition transform active:scale-95 ${
-                      avatarUrl === preset ? 'border-blue-500 ring-2 ring-blue-300 scale-105' : 'border-slate-200 opacity-70 hover:opacity-100'
-                    }`}
+                    className={`rounded-2xl overflow-hidden border-2 transition transform active:scale-95 ${avatarUrl === preset ? 'border-blue-500 ring-2 ring-blue-300 scale-105' : 'border-slate-200 opacity-70 hover:opacity-100'
+                      }`}
                   >
                     <img src={preset} alt={`Avatar ${idx + 1}`} className="w-full h-12 object-cover" />
                   </button>
@@ -301,7 +309,7 @@ export function ProfilePage() {
             {/* Name */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nama Lengkap Mahasiswa *
+                Nama Lengkap *
               </label>
               <input
                 type="text"
@@ -313,17 +321,17 @@ export function ProfilePage() {
               />
             </div>
 
-            {/* Student ID (NIM) */}
+            {/* Student ID (NIM / NIDN) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nomor Induk Mahasiswa (NIM UPB) *
+                {role === 'lecturer' ? 'Nomor Induk Dosen Nasional (NIDN)' : 'Nomor Induk Mahasiswa (NIM UPB)'} *
               </label>
               <input
                 type="text"
                 required
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                placeholder="NIM"
+                placeholder={role === 'lecturer' ? 'NIDN' : 'NIM'}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition font-bold"
               />
             </div>
@@ -332,14 +340,14 @@ export function ProfilePage() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
                 <Mail className="w-3.5 h-3.5 text-blue-500" />
-                Alamat Email Student
+                Alamat Email
               </label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@students.upb.ac.id"
+                placeholder="email@upb.ac.id"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
               />
             </div>
@@ -366,14 +374,24 @@ export function ProfilePage() {
                 <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
                 Role Akun Aplikasi
               </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500 focus:bg-white transition"
-              >
-                <option value="student">Mahasiswa (Student)</option>
-                <option value="admin">Administrator / Koordinator (Admin)</option>
-              </select>
+              {currentUser?.role === 'admin' ? (
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                >
+                  <option value="student">Mahasiswa (Student)</option>
+                  <option value="lecturer">Dosen Pembimbing (Lecturer)</option>
+                  <option value="admin">Administrator / Koordinator (Admin)</option>
+                </select>
+              ) : (
+                <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-800 font-bold flex items-center justify-between">
+                  <span>
+                    {role === 'lecturer' ? 'Dosen Pembimbing (Lecturer)' : role === 'admin' ? 'Administrator / Koordinator' : 'Mahasiswa (Student)'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium italic">Role Dikunci (Hanya Admin)</span>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

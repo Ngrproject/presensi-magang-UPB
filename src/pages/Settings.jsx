@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
-import { 
-  Building2, MapPin, Lock, Unlock, Clock, Calendar, 
-  RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info, 
+import { useAuth } from '../context/AuthContext';
+import {
+  Building2, MapPin, Lock, Unlock, Clock, Calendar,
+  RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info,
   Layers, Sun, Moon, Sunrise, CalendarDays
 } from 'lucide-react';
 
@@ -11,12 +12,13 @@ const ALL_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'
 
 export function SettingsPage({ setActiveTab }) {
   const { settings, updateSettings, auditLogs } = useApp();
+  const { updateUserProfile } = useAuth();
 
   const [companyName, setCompanyName] = useState(settings.companyName || '');
   const [targetLat, setTargetLat] = useState(settings.targetLat ?? -6.2088);
   const [targetLon, setTargetLon] = useState(settings.targetLon ?? 106.8456);
   const [geofenceRadius, setGeofenceRadius] = useState(settings.geofenceRadius || 50);
-  
+
   // Work Mode & Shifts
   const [scheduleMode, setScheduleMode] = useState(settings.scheduleMode || 'REGULER');
   const [selectedShift, setSelectedShift] = useState(settings.selectedShift || 'SHIFT_1');
@@ -29,10 +31,10 @@ export function SettingsPage({ setActiveTab }) {
   // Regular Hours
   const [checkInStart, setCheckInStart] = useState(settings.workHours?.checkInStart || '08:00');
   const [checkOutStart, setCheckOutStart] = useState(settings.workHours?.checkOutStart || '16:00');
-  
+
   // Custom Work Days & Off-Days
   const [workDays, setWorkDays] = useState(settings.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
-  
+
   // Custom Per-Day Hours
   const [useCustomDailyHours, setUseCustomDailyHours] = useState(settings.useCustomDailyHours || false);
   const [dailyHours, setDailyHours] = useState(settings.dailyHours || {
@@ -161,8 +163,12 @@ export function SettingsPage({ setActiveTab }) {
       changeReason
     );
 
+    if (updateUserProfile) {
+      updateUserProfile({ isNewUser: false });
+    }
+
     setSavedAlert(true);
-    
+
     confetti({
       particleCount: 100,
       spread: 80,
@@ -179,7 +185,7 @@ export function SettingsPage({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Onboarding Welcome Hero Banner */}
       {isFirstTimeOnboarding && (
         <div className="bg-gradient-to-r from-blue-600 via-sky-500 to-blue-500 text-white rounded-3xl p-6 shadow-xl shadow-blue-500/20 space-y-3 animate-fade-in border border-blue-300">
@@ -211,11 +217,10 @@ export function SettingsPage({ setActiveTab }) {
       {/* Lock Status Alert Banner */}
       {!isFirstTimeOnboarding && (
         <div
-          className={`p-4 rounded-3xl border flex flex-wrap items-center justify-between shadow-xs gap-3 ${
-            settings.isLocked
+          className={`p-4 rounded-3xl border flex flex-wrap items-center justify-between shadow-xs gap-3 ${settings.isLocked
               ? 'bg-amber-50 border-amber-300 text-amber-900'
               : 'bg-emerald-50 border-emerald-300 text-emerald-900'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-white shadow-xs border border-slate-200">
@@ -249,10 +254,10 @@ export function SettingsPage({ setActiveTab }) {
 
       {/* Grid Layout: Desktop 2-Column, Mobile Stacked */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Main Settings Form */}
         <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-5">
-          
+
           {/* Section 1: Perusahaan Profile */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
             <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -285,11 +290,10 @@ export function SettingsPage({ setActiveTab }) {
               <button
                 type="button"
                 onClick={() => setScheduleMode('REGULER')}
-                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${
-                  scheduleMode === 'REGULER'
+                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${scheduleMode === 'REGULER'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <span className="text-xs font-black flex items-center gap-1.5">
                   💼 Jam Reguler (Non-Shift)
@@ -302,11 +306,10 @@ export function SettingsPage({ setActiveTab }) {
               <button
                 type="button"
                 onClick={() => setScheduleMode('SHIFT')}
-                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${
-                  scheduleMode === 'SHIFT'
+                className={`p-4 rounded-2xl border text-left flex flex-col gap-1 transition ${scheduleMode === 'SHIFT'
                     ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md font-bold'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 <span className="text-xs font-black flex items-center gap-1.5">
                   🔄 Mode Shift (1, 2, 3)
@@ -333,11 +336,10 @@ export function SettingsPage({ setActiveTab }) {
                         key={sKey}
                         type="button"
                         onClick={() => setSelectedShift(sKey)}
-                        className={`p-3 rounded-xl border text-center text-xs font-bold transition ${
-                          isSelected
+                        className={`p-3 rounded-xl border text-center text-xs font-bold transition ${isSelected
                             ? 'bg-amber-600 text-white border-amber-600 shadow-md'
                             : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100/50'
-                        }`}
+                          }`}
                       >
                         {shifts[sKey]?.name || sKey}
                       </button>
@@ -398,16 +400,14 @@ export function SettingsPage({ setActiveTab }) {
                       key={day}
                       type="button"
                       onClick={() => handleToggleDay(day)}
-                      className={`p-3 rounded-2xl border text-center text-xs font-bold transition flex items-center justify-between ${
-                        isWorkDay
+                      className={`p-3 rounded-2xl border text-center text-xs font-bold transition flex items-center justify-between ${isWorkDay
                           ? 'bg-blue-50 text-blue-900 border-blue-300'
                           : 'bg-red-50 text-red-800 border-red-200 opacity-70'
-                      }`}
+                        }`}
                     >
                       <span>{day}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        isWorkDay ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
-                      }`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isWorkDay ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
+                        }`}>
                         {isWorkDay ? 'KERJA' : 'LIBUR'}
                       </span>
                     </button>
@@ -428,11 +428,10 @@ export function SettingsPage({ setActiveTab }) {
                 type="button"
                 onClick={handleGrabGps}
                 disabled={settings.isLocked || isGrabbingGps}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition ${
-                  settings.isLocked
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition ${settings.isLocked
                     ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                     : 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-xs border border-amber-300'
-                }`}
+                  }`}
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${isGrabbingGps ? 'animate-spin' : ''}`} />
                 <span>{isGrabbingGps ? 'Mengambil...' : 'Ambil GPS Saat Ini'}</span>
@@ -607,11 +606,10 @@ export function SettingsPage({ setActiveTab }) {
                       setDurationMonths(m);
                       setUseCustomEndDate(false);
                     }}
-                    className={`py-2.5 rounded-2xl text-xs font-bold border transition ${
-                      !useCustomEndDate && durationMonths === m
+                    className={`py-2.5 rounded-2xl text-xs font-bold border transition ${!useCustomEndDate && durationMonths === m
                         ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20'
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {m} Bulan
                   </button>

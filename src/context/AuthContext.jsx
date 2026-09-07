@@ -1,16 +1,46 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { isFirebaseConfigured, auth, db } from '../utils/firebase';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged 
+  onAuthStateChanged
 } from 'firebase/auth';
-import { 
-  doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, onSnapshot 
+import {
+  doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, onSnapshot
 } from 'firebase/firestore';
 
 const AuthContext = createContext(null);
+
+const DEFAULT_LECTURERS = [
+  {
+    uid: 'dosen_1',
+    studentId: '0612038401', // NIDN
+    name: 'Dr. Hendra Wijaya, M.Kom',
+    email: 'hendra.wijaya@upb.ac.id',
+    university: 'Universitas Putra Bangsa (UPB)',
+    role: 'lecturer',
+    avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=250&q=80'
+  },
+  {
+    uid: 'dosen_2',
+    studentId: '0625078102', // NIDN
+    name: 'Dra. Ratna Sarumpaet, M.T.',
+    email: 'ratna.sarumpaet@upb.ac.id',
+    university: 'Universitas Putra Bangsa (UPB)',
+    role: 'lecturer',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80'
+  },
+  {
+    uid: 'dosen_3',
+    studentId: '0608118903', // NIDN
+    name: 'Budi Pratama, S.T., M.Eng.',
+    email: 'budi.pratama@upb.ac.id',
+    university: 'Universitas Putra Bangsa (UPB)',
+    role: 'lecturer',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80'
+  }
+];
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -19,7 +49,12 @@ export function AuthProvider({ children }) {
   });
   const [allUsers, setAllUsers] = useState(() => {
     const saved = localStorage.getItem('all_registered_users');
-    return saved ? JSON.parse(saved) : [];
+    let parsed = saved ? JSON.parse(saved) : [];
+    if (!parsed.some(u => u.role === 'lecturer')) {
+      parsed = [...parsed, ...DEFAULT_LECTURERS];
+      localStorage.setItem('all_registered_users', JSON.stringify(parsed));
+    }
+    return parsed;
   });
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
@@ -32,6 +67,11 @@ export function AuthProvider({ children }) {
         const list = [];
         snap.forEach((docSnap) => {
           list.push({ uid: docSnap.id, ...docSnap.data() });
+        });
+        DEFAULT_LECTURERS.forEach(d => {
+          if (!list.some(u => u.uid === d.uid || u.studentId === d.studentId)) {
+            list.push(d);
+          }
         });
         setAllUsers(list);
         localStorage.setItem('all_registered_users', JSON.stringify(list));
@@ -49,7 +89,7 @@ export function AuthProvider({ children }) {
           try {
             const userDocRef = doc(db, 'users', user.uid);
             const userSnap = await getDoc(userDocRef);
-            
+
             let userProfile;
             if (userSnap.exists()) {
               userProfile = { uid: user.uid, role: 'student', ...userSnap.data() };
@@ -65,7 +105,7 @@ export function AuthProvider({ children }) {
               };
               await setDoc(userDocRef, userProfile);
             }
-            
+
             setCurrentUser(userProfile);
             localStorage.setItem('presensi_user_session', JSON.stringify(userProfile));
           } catch (err) {
@@ -86,12 +126,12 @@ export function AuthProvider({ children }) {
 
   const updateUserProfile = async (updatedFields) => {
     if (!currentUser) return;
-    
+
     const nextUser = {
       ...currentUser,
       ...updatedFields
     };
-    
+
     setCurrentUser(nextUser);
     localStorage.setItem('presensi_user_session', JSON.stringify(nextUser));
 
@@ -125,7 +165,7 @@ export function AuthProvider({ children }) {
             const usersRef = collection(db, 'users');
             const q = query(usersRef, where('studentId', '==', identifier));
             const querySnapshot = await getDocs(q);
-            
+
             if (!querySnapshot.empty) {
               const matchedData = querySnapshot.docs[0].data();
               if (matchedData.email) {
@@ -144,11 +184,11 @@ export function AuthProvider({ children }) {
 
         let userCred;
         const isAdminAccount = identifier.toLowerCase().includes('admin') || targetEmail.toLowerCase().includes('admin');
+        const isLecturerAccount = identifier.toLowerCase().includes('dosen') || targetEmail.toLowerCase().includes('dosen');
 
         try {
           userCred = await signInWithEmailAndPassword(auth, targetEmail, password);
         } catch (signErr) {
-          // If this is an Admin login attempt and the account does not exist in Firebase Auth yet, auto-create it
           if (isAdminAccount && (signErr.code === 'auth/user-not-found' || signErr.code === 'auth/invalid-credential')) {
             try {
               userCred = await createUserWithEmailAndPassword(auth, targetEmail, password);
@@ -160,51 +200,60 @@ export function AuthProvider({ children }) {
             throw signErr;
           }
         }
-        
+
         const userDocRef = doc(db, 'users', userCred.user.uid);
         const userSnap = await getDoc(userDocRef);
-        
+
         let userProfile;
         if (userSnap.exists()) {
           const data = userSnap.data();
-          userProfile = { 
-            uid: userCred.user.uid, 
-            role: data.role || (isAdminAccount ? 'admin' : 'student'), 
-            ...data 
+          userProfile = {
+            uid: userCred.user.uid,
+            role: data.role || (isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student'),
+            ...data,
+            isNewUser: false
           };
         } else {
           userProfile = {
             uid: userCred.user.uid,
             email: userCred.user.email,
             studentId: identifier.includes('@') ? userCred.user.email.split('@')[0] : identifier,
-            name: isAdminAccount ? 'Administrator UPB' : `Mahasiswa (${identifier})`,
+            name: isAdminAccount ? 'Administrator UPB' : isLecturerAccount ? `Dosen Pembimbing (${identifier})` : `Mahasiswa (${identifier})`,
             university: 'Universitas Putra Bangsa (UPB)',
-            role: isAdminAccount ? 'admin' : 'student',
-            avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80'
+            role: isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student',
+            avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+            isNewUser: true
           };
           await setDoc(userDocRef, userProfile);
         }
-        
+
         setCurrentUser(userProfile);
         localStorage.setItem('presensi_user_session', JSON.stringify(userProfile));
       } else {
         await new Promise((r) => setTimeout(r, 400));
         const isEmail = identifier.includes('@');
         const isAdminAccount = identifier.toLowerCase().includes('admin');
-        const loggedUser = {
-          uid: isAdminAccount ? 'user_admin_default' : `user_${Date.now()}`,
+        const isLecturerAccount = identifier.toLowerCase().includes('dosen');
+        
+        // Match existing user in allUsers by studentId/NIDN, email, or uid
+        const existingMatched = allUsers.find(
+          u => u.studentId === identifier || u.email === identifier || u.uid === identifier
+        );
+
+        const loggedUser = existingMatched || {
+          uid: isAdminAccount ? 'user_admin_default' : isLecturerAccount ? `user_dosen_${identifier}` : `user_${identifier}`,
           studentId: isEmail ? identifier.split('@')[0] : identifier,
           email: isEmail ? identifier : `${identifier}@students.upb.ac.id`,
-          name: isAdminAccount ? 'Administrator UPB' : `Mahasiswa (${identifier})`,
+          name: isAdminAccount ? 'Administrator UPB' : isLecturerAccount ? `Dosen Pembimbing (${identifier})` : `Mahasiswa (${identifier})`,
           university: 'Universitas Putra Bangsa (UPB)',
-          role: isAdminAccount ? 'admin' : 'student',
+          role: isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
           isNewUser: false
         };
-        setCurrentUser(loggedUser);
-        localStorage.setItem('presensi_user_session', JSON.stringify(loggedUser));
 
-        // Add to mock allUsers list if not present
+        setCurrentUser({ ...loggedUser, isNewUser: false });
+        localStorage.setItem('presensi_user_session', JSON.stringify({ ...loggedUser, isNewUser: false }));
+
         setAllUsers((prev) => {
           if (!prev.some(u => u.uid === loggedUser.uid || u.studentId === loggedUser.studentId)) {
             const updated = [loggedUser, ...prev];
@@ -251,7 +300,7 @@ export function AuthProvider({ children }) {
       if (isFirebaseConfigured && auth && db) {
         const targetEmail = newUserProfile.email;
         const userCred = await createUserWithEmailAndPassword(auth, targetEmail, password);
-        
+
         const fullProfile = {
           uid: userCred.user.uid,
           ...newUserProfile
@@ -323,15 +372,24 @@ export function AuthProvider({ children }) {
 
   const adminUpdateUser = async (uid, updatedFields) => {
     setAllUsers((prev) => {
-      const updated = prev.map(u => u.uid === uid ? { ...u, ...updatedFields } : u);
+      const updated = prev.map(u => (u.uid === uid || u.studentId === uid) ? { ...u, ...updatedFields } : u);
       localStorage.setItem('all_registered_users', JSON.stringify(updated));
       return updated;
     });
 
-    if (currentUser?.uid === uid) {
+    if (currentUser?.uid === uid || currentUser?.studentId === uid) {
       const updatedSelf = { ...currentUser, ...updatedFields };
       setCurrentUser(updatedSelf);
       localStorage.setItem('presensi_user_session', JSON.stringify(updatedSelf));
+    } else {
+      const savedSession = localStorage.getItem('presensi_user_session');
+      if (savedSession) {
+        const parsedSession = JSON.parse(savedSession);
+        if (parsedSession.uid === uid || parsedSession.studentId === uid || parsedSession.studentId === updatedFields.studentId) {
+          const updatedSession = { ...parsedSession, ...updatedFields };
+          localStorage.setItem('presensi_user_session', JSON.stringify(updatedSession));
+        }
+      }
     }
 
     if (isFirebaseConfigured && db) {

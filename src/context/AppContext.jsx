@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { isFirebaseConfigured, db } from '../utils/firebase';
-import { 
-  collection, doc, getDoc, setDoc, query, where, 
-  onSnapshot, getDocs, addDoc 
+import {
+  collection, doc, setDoc, query, where,
+  onSnapshot, getDocs, addDoc
 } from 'firebase/firestore';
 
 const AppContext = createContext(null);
@@ -87,7 +87,27 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Real-time Firestore sync listeners
+  const [allPresenceLogs, setAllPresenceLogs] = useState(() => {
+    const saved = localStorage.getItem('all_presence_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [allLogbooks, setAllLogbooks] = useState(() => {
+    const saved = localStorage.getItem('all_logbooks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [mentorshipRequests, setMentorshipRequests] = useState(() => {
+    const saved = localStorage.getItem('mentorship_requests_all');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [bimbinganMessages, setBimbinganMessages] = useState(() => {
+    const saved = localStorage.getItem('bimbingan_messages_all');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Real-time Firestore sync listeners for individual user context
   useEffect(() => {
     if (!userId || userId === 'guest') {
       setSettings(DEFAULT_SETTINGS);
@@ -198,6 +218,61 @@ export function AppProvider({ children }) {
     }
   }, [userId]);
 
+  // Real-time Firestore sync listeners for global collections (admin & lecturer views)
+  useEffect(() => {
+    if (isFirebaseConfigured && db) {
+      const presencesRef = collection(db, 'presences');
+      const unsubAllPres = onSnapshot(presencesRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setAllPresenceLogs(list);
+        localStorage.setItem('all_presence_logs', JSON.stringify(list));
+      }, (err) => console.log('Firestore all presences listener info:', err));
+
+      const logbooksRef = collection(db, 'logbooks');
+      const unsubAllLogs = onSnapshot(logbooksRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+        setAllLogbooks(list);
+        localStorage.setItem('all_logbooks', JSON.stringify(list));
+      }, (err) => console.log('Firestore all logbooks listener info:', err));
+
+      const reqRef = collection(db, 'mentorship_requests');
+      const unsubRequests = onSnapshot(reqRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        setMentorshipRequests(list);
+        localStorage.setItem('mentorship_requests_all', JSON.stringify(list));
+      }, (err) => console.log('Firestore mentorship requests info:', err));
+
+      const msgRef = collection(db, 'bimbingan_messages');
+      const unsubMessages = onSnapshot(msgRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+        setBimbinganMessages(list);
+        localStorage.setItem('bimbingan_messages_all', JSON.stringify(list));
+      }, (err) => console.log('Firestore bimbingan messages info:', err));
+
+      return () => {
+        unsubAllPres();
+        unsubAllLogs();
+        unsubRequests();
+        unsubMessages();
+      };
+    }
+  }, []);
+
   const getTodayStr = () => new Date().toISOString().split('T')[0];
 
   const getTodayPresence = () => {
@@ -217,7 +292,6 @@ export function AppProvider({ children }) {
     return logbooks.find((l) => l.dateStr === yesterdayStr) || null;
   };
 
-  // Dynamically resolve today's required check-out time based on mode/shift/custom daily hours
   const getTodayRequiredCheckOutStr = () => {
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const todayName = dayNames[new Date().getDay()];
@@ -283,8 +357,7 @@ export function AppProvider({ children }) {
   const addCheckIn = async ({ photoDataUrl, userLat, userLon, distance }) => {
     const todayStr = getTodayStr();
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
-    
-    // Resolve start time for late calculation
+
     let reqCheckInStr = settings.workHours?.checkInStart || '08:00';
     if (settings.scheduleMode === 'SHIFT') {
       reqCheckInStr = settings.shifts?.[settings.selectedShift]?.start || '07:00';
@@ -332,7 +405,7 @@ export function AppProvider({ children }) {
       const lockUpdated = { ...settings, isLocked: true };
       setSettings(lockUpdated);
       if (isFirebaseConfigured && db && userId) {
-        setDoc(doc(db, 'settings', userId), lockUpdated, { merge: true }).catch(() => {});
+        setDoc(doc(db, 'settings', userId), lockUpdated, { merge: true }).catch(() => { });
       }
     }
 
@@ -346,13 +419,11 @@ export function AppProvider({ children }) {
   };
 
   const addCheckOut = async ({ photoDataUrl, userLat, userLon, distance }) => {
-    // 1. Guardrail: Daily Logbook required
     const todayLogbook = getTodayLogbook();
     if (!todayLogbook || (!todayLogbook.achievements && !todayLogbook.obstacles)) {
       throw new Error('GUARDRAIL_LOGBOOK_REQUIRED');
     }
 
-    // 2. Guardrail: Must be AFTER required check-out time
     const reqTimeString = getTodayRequiredCheckOutStr();
     const parts = reqTimeString.split(':');
     const reqHour = parseInt(parts[0], 10) || 16;
@@ -397,7 +468,6 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Submit Leave / Ketidakhadiran Record (SAKIT, IZIN, LIBUR NASIONAL, LIBUR INSTANSI)
   const addLeaveRecord = async ({ leaveType, reason, proofDataUrl, dateStr = getTodayStr() }) => {
     const recordId = `leave_${userId}_${dateStr}`;
 
@@ -474,48 +544,6 @@ export function AppProvider({ children }) {
     }
   };
 
-  const [allPresenceLogs, setAllPresenceLogs] = useState(() => {
-    const saved = localStorage.getItem('all_presence_logs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [allLogbooks, setAllLogbooks] = useState(() => {
-    const saved = localStorage.getItem('all_logbooks');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Real-time Firestore sync listeners for admin views
-  useEffect(() => {
-    if (isFirebaseConfigured && db) {
-      const presencesRef = collection(db, 'presences');
-      const unsubAllPres = onSnapshot(presencesRef, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
-        setAllPresenceLogs(list);
-        localStorage.setItem('all_presence_logs', JSON.stringify(list));
-      }, (err) => console.log('Firestore all presences listener info:', err));
-
-      const logbooksRef = collection(db, 'logbooks');
-      const unsubAllLogs = onSnapshot(logbooksRef, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
-        setAllLogbooks(list);
-        localStorage.setItem('all_logbooks', JSON.stringify(list));
-      }, (err) => console.log('Firestore all logbooks listener info:', err));
-
-      return () => {
-        unsubAllPres();
-        unsubAllLogs();
-      };
-    }
-  }, []);
-
   const adminUnlockStudentSettings = async (targetUserId) => {
     if (!targetUserId) return;
 
@@ -525,7 +553,6 @@ export function AppProvider({ children }) {
       localStorage.setItem(settingsKey, JSON.stringify(updated));
     }
 
-    // Also update target user's settings in localStorage for local fallback
     const targetSettingsKey = `settings_${targetUserId}`;
     const savedTarget = localStorage.getItem(targetSettingsKey);
     if (savedTarget) {
@@ -570,7 +597,6 @@ export function AppProvider({ children }) {
       updatedAt: new Date().toISOString()
     };
 
-    // Update target student's individual presence list in localStorage
     const targetPresenceKey = `presence_${targetUserId}`;
     const savedTargetPresences = localStorage.getItem(targetPresenceKey);
     let targetList = savedTargetPresences ? JSON.parse(savedTargetPresences) : [];
@@ -583,12 +609,10 @@ export function AppProvider({ children }) {
     targetList.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
     localStorage.setItem(targetPresenceKey, JSON.stringify(targetList));
 
-    // If currently logged-in user IS the target student, update active presenceLogs state
     if (targetUserId === userId) {
       setPresenceLogs(targetList);
     }
 
-    // Update global presence logs list for admin views
     setAllPresenceLogs((prev) => {
       const idx = prev.findIndex((p) => p.id === recordId);
       let updated;
@@ -612,7 +636,6 @@ export function AppProvider({ children }) {
   };
 
   const adminDeletePresence = async (recordId) => {
-    // Find record to identify targetUserId
     const targetRecord = allPresenceLogs.find(p => p.id === recordId) || presenceLogs.find(p => p.id === recordId);
     if (targetRecord?.userId) {
       const targetPresenceKey = `presence_${targetRecord.userId}`;
@@ -643,6 +666,146 @@ export function AppProvider({ children }) {
     }
   };
 
+  // Mentorship (Bimbingan) Methods
+  const requestMentorship = async ({ lecturerId, lecturerName }) => {
+    if (!currentUser) return;
+    const reqId = `req_${currentUser.uid}_${Date.now()}`;
+    const newReq = {
+      id: reqId,
+      studentId: currentUser.studentId || '',
+      studentUid: currentUser.uid,
+      studentName: currentUser.name,
+      studentEmail: currentUser.email,
+      studentUniversity: currentUser.university || 'Universitas Putra Bangsa (UPB)',
+      lecturerId,
+      lecturerName,
+      status: 'PENDING', // 'PENDING' | 'APPROVED' | 'REJECTED'
+      createdAt: new Date().toISOString()
+    };
+
+    setMentorshipRequests(prev => {
+      const isMatch = (r) =>
+        r.studentUid === currentUser.uid ||
+        r.studentId === currentUser.studentId ||
+        r.studentUid === currentUser.studentId ||
+        r.studentId === currentUser.uid;
+      const filtered = prev.filter(r => !isMatch(r));
+      const updated = lecturerId ? [newReq, ...filtered] : filtered;
+      localStorage.setItem('mentorship_requests_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'mentorship_requests', reqId), newReq);
+      } catch (err) {
+        console.error("Firestore requestMentorship error:", err);
+      }
+    }
+  };
+
+  const respondMentorship = async (requestId, newStatus) => {
+    setMentorshipRequests(prev => {
+      const updated = prev.map(r => r.id === requestId ? { ...r, status: newStatus, respondedAt: new Date().toISOString() } : r);
+      localStorage.setItem('mentorship_requests_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'mentorship_requests', requestId), {
+          status: newStatus,
+          respondedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Firestore respondMentorship error:", err);
+      }
+    }
+  };
+
+  const adminAssignMentorship = async ({ studentUid, studentNim, studentName, studentEmail, studentUniversity, lecturerId, lecturerName }) => {
+    if (!studentUid && !studentNim && !studentName) return;
+
+    const isMatch = (r) => {
+      const matchUid = studentUid && (r.studentUid === studentUid || r.studentId === studentUid);
+      const matchNim = studentNim && (r.studentUid === studentNim || r.studentId === studentNim);
+      const matchName = studentName && (r.studentName && r.studentName.toLowerCase() === studentName.toLowerCase());
+      const matchEmail = studentEmail && (r.studentEmail && r.studentEmail.toLowerCase() === studentEmail.toLowerCase());
+      return Boolean(matchUid || matchNim || matchName || matchEmail);
+    };
+
+    if (!lecturerId) {
+      setMentorshipRequests(prev => {
+        const updated = prev.filter(r => !isMatch(r));
+        localStorage.setItem('mentorship_requests_all', JSON.stringify(updated));
+        return updated;
+      });
+      return;
+    }
+
+    const reqId = `req_${studentUid || studentNim || Date.now()}_admin`;
+    const newReq = {
+      id: reqId,
+      studentId: studentNim || '',
+      studentUid: studentUid || studentNim || '',
+      studentName: studentName || 'Mahasiswa',
+      studentEmail: studentEmail || '',
+      studentUniversity: studentUniversity || 'Universitas Putra Bangsa (UPB)',
+      lecturerId,
+      lecturerName,
+      status: 'APPROVED',
+      createdAt: new Date().toISOString(),
+      respondedAt: new Date().toISOString(),
+      assignedByAdmin: true
+    };
+
+    setMentorshipRequests(prev => {
+      const filtered = prev.filter(r => !isMatch(r));
+      const updated = [newReq, ...filtered];
+      localStorage.setItem('mentorship_requests_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'mentorship_requests', reqId), newReq);
+      } catch (err) {
+        console.error("Firestore adminAssignMentorship error:", err);
+      }
+    }
+  };
+
+  const sendBimbinganMessage = async ({ requestId, message, fileName = null, fileDataUrl = null, fileType = null }) => {
+    if (!currentUser) return;
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newMsg = {
+      id: msgId,
+      requestId,
+      senderId: currentUser.uid,
+      senderName: currentUser.name,
+      senderRole: currentUser.role || 'student',
+      message: message || '',
+      fileName,
+      fileDataUrl,
+      fileType,
+      timestamp: new Date().toISOString()
+    };
+
+    setBimbinganMessages(prev => {
+      const updated = [...prev, newMsg];
+      localStorage.setItem('bimbingan_messages_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'bimbingan_messages', msgId), newMsg);
+      } catch (err) {
+        console.error("Firestore sendBimbinganMessage error:", err);
+      }
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -653,6 +816,8 @@ export function AppProvider({ children }) {
         logbooks,
         allLogbooks,
         auditLogs,
+        mentorshipRequests,
+        bimbinganMessages,
         getTodayPresence,
         getTodayLogbook,
         getYesterdayLogbook,
@@ -664,7 +829,11 @@ export function AppProvider({ children }) {
         saveLogbook,
         adminUnlockStudentSettings,
         adminSavePresence,
-        adminDeletePresence
+        adminDeletePresence,
+        requestMentorship,
+        respondMentorship,
+        adminAssignMentorship,
+        sendBimbinganMessage
       }}
     >
       {children}

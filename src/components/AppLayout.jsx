@@ -1,84 +1,43 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, Camera, BookOpen, 
-  Settings, LogOut, Building2, User, FileText, ShieldCheck
-} from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { BottomNav } from './BottomNav';
 
 export function AppLayout({ children, activeTab, setActiveTab }) {
   const { currentUser, logout } = useAuth();
-  const isAdmin = currentUser?.role === 'admin';
-
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'presence', label: 'Presensi', icon: Camera },
-    { id: 'logbook', label: 'Logbook', icon: BookOpen },
-    { id: 'reports', label: 'Laporan', icon: FileText },
-    { id: 'settings', label: 'Konfigurasi Instansi', icon: Settings },
-    { id: 'profile', label: 'Profil Saya', icon: User }
-  ];
-
-  if (isAdmin) {
-    navItems.unshift({ id: 'admin', label: 'Panel Admin', icon: ShieldCheck });
-  }
+  const isLecturer = currentUser?.role === 'lecturer';
 
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-500 selection:text-white relative">
-      
+
       {/* Top Professional Header Navbar */}
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          
+
           {/* Logo & Brand: E-PRESENSI MAGANG UPB with Official UPB Emblem */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <img
               src="/logo-upb.png"
               alt="Logo Universitas Putra Bangsa"
-              className="w-10 h-10 object-contain drop-shadow-xs shrink-0"
+              className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs shrink-0"
             />
-            <div>
-              <h1 className="text-base font-black tracking-tight text-blue-900">
+            <div className="whitespace-nowrap">
+              <h1 className="text-sm sm:text-base font-black tracking-tight text-blue-900 leading-tight">
                 E-PRESENSI MAGANG UPB
               </h1>
-              <p className="text-[10px] text-slate-500 font-medium hidden sm:block">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium hidden sm:block leading-tight">
                 Sistem Portal Presensi & Logbook Mahasiswa UPB
               </p>
             </div>
           </div>
-
-          {/* Desktop Navigation Links */}
-          {currentUser && (
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl border border-slate-200">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                      isActive
-                        ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-600 hover:text-blue-700 hover:bg-slate-200/60'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-amber-300' : ''}`} />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          )}
 
           {/* User Profile Quick Menu */}
           {currentUser ? (
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setActiveTab('profile')}
-                className={`flex items-center gap-2 text-right p-1 rounded-2xl transition hover:bg-blue-50 border ${
-                  activeTab === 'profile' ? 'border-blue-500 bg-blue-50' : 'border-transparent'
-                }`}
+                className={`flex items-center gap-2 text-right p-1 rounded-2xl transition hover:bg-blue-50 border ${activeTab === 'profile' ? 'border-blue-500 bg-blue-50' : 'border-transparent'
+                  }`}
               >
                 <img
                   src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
@@ -90,7 +49,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
                     {currentUser.name}
                   </p>
                   <p className="text-[10px] text-blue-600 font-mono font-semibold">
-                    NIM: {currentUser.studentId}
+                    {isLecturer ? 'NIDN' : 'NIM'}: {currentUser.studentId}
                   </p>
                 </div>
               </button>
@@ -111,14 +70,14 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
         </div>
       </header>
 
-      {/* Main Content Area with Bottom Padding for Mobile Nav */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-8 print:p-0 print:m-0 print:max-w-none">
+      {/* Main Content Area with Bottom Padding for Bottom Nav */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 print:p-0 print:m-0 print:max-w-none">
         {children}
       </main>
 
-      {/* Mobile Floating Bottom Navigation (Fixed at bottom on viewport < 768px) */}
+      {/* Floating Bottom Navigation Bar for all screens */}
       {currentUser && (
-        <div className="md:hidden print:hidden">
+        <div className="print:hidden">
           <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
       )}

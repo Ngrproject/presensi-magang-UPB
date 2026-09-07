@@ -65,12 +65,12 @@ export function CameraStream({ onCapture, capturedPhoto, onResetPhoto }) {
     canvas.height = video.videoHeight || 640;
 
     const ctx = canvas.getContext('2d');
-    
+
     if (facingMode === 'user') {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
-    
+
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
@@ -90,7 +90,7 @@ export function CameraStream({ onCapture, capturedPhoto, onResetPhoto }) {
     <div className="relative w-full flex flex-col items-center">
       {/* Viewfinder Frame */}
       <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-full overflow-hidden border-4 border-blue-600 shadow-[0_0_30px_rgba(37,99,235,0.25)] bg-slate-950 flex items-center justify-center">
-        
+
         {capturedPhoto ? (
           <img
             src={capturedPhoto}
@@ -109,14 +109,13 @@ export function CameraStream({ onCapture, capturedPhoto, onResetPhoto }) {
               autoPlay
               playsInline
               muted
-              className={`w-full h-full object-cover ${
-                facingMode === 'user' ? 'scale-x-[-1]' : ''
-              }`}
+              className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''
+                }`}
             />
             {/* Viewfinder Target Crosshairs HUD */}
             <div className="absolute inset-0 border-2 border-dashed border-amber-400/60 rounded-full pointer-events-none animate-spin-slow" />
             <div className="absolute w-48 h-48 border border-blue-400/40 rounded-full pointer-events-none" />
-            
+
             {/* Anti-Fraud Watermark Overlay */}
             <div className="absolute bottom-4 inset-x-0 text-center">
               <span className="bg-slate-900/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-mono text-amber-300 border border-amber-400/30 shadow-lg">

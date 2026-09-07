@@ -3,10 +3,10 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
 import { calculateDistance } from '../utils/haversine';
 import { CameraStream } from '../components/CameraStream';
-import { 
-  Camera, MapPin, CheckCircle2, AlertTriangle, 
-  Clock, ShieldAlert, LogOut, CheckSquare, Building2, BookOpen, 
-  FileText, Calendar, Upload, Stethoscope, Mail, Flag, ShieldCheck 
+import {
+  Camera, MapPin, CheckCircle2, AlertTriangle,
+  Clock, ShieldAlert, LogOut, CheckSquare, Building2, BookOpen,
+  FileText, Calendar, Upload, Stethoscope, Mail, Flag, ShieldCheck
 } from 'lucide-react';
 
 const LEAVE_TYPES = [
@@ -21,14 +21,14 @@ export function PresencePage({ setActiveTab }) {
   const proofInputRef = useRef(null);
 
   const [activeSubMode, setActiveSubMode] = useState('hadir'); // 'hadir' | 'izin'
-  
+
   // Presence Hadir States
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
   const [distance, setDistance] = useState(null);
   const [inGeofence, setInGeofence] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
-  
+
   // Leave Form States
   const [selectedLeaveType, setSelectedLeaveType] = useState('SAKIT');
   const [leaveReason, setLeaveReason] = useState('');
@@ -287,7 +287,7 @@ export function PresencePage({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Hidden File Picker for Proof Attachment */}
       <input
         type="file"
@@ -313,22 +313,20 @@ export function PresencePage({ setActiveTab }) {
           <button
             type="button"
             onClick={() => setActiveSubMode('hadir')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeSubMode === 'hadir'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeSubMode === 'hadir'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-700 hover:bg-slate-300/60'
-            }`}
+              }`}
           >
             📸 Presensi Hadir (Selfie)
           </button>
           <button
             type="button"
             onClick={() => setActiveSubMode('izin')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeSubMode === 'izin'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeSubMode === 'izin'
                 ? 'bg-amber-600 text-white shadow-md'
                 : 'text-slate-700 hover:bg-slate-300/60'
-            }`}
+              }`}
           >
             📝 Form Izin / Libur
           </button>
@@ -379,9 +377,8 @@ export function PresencePage({ setActiveTab }) {
                       key={type.id}
                       type="button"
                       onClick={() => setSelectedLeaveType(type.id)}
-                      className={`p-3.5 rounded-2xl border text-left flex flex-col items-center text-center gap-2 transition ${
-                        isSelected ? type.activeBg + ' border-transparent shadow-md' : type.color
-                      }`}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col items-center text-center gap-2 transition ${isSelected ? type.activeBg + ' border-transparent shadow-md' : type.color
+                        }`}
                     >
                       <Icon className="w-6 h-6" />
                       <span className="text-xs font-bold">{type.label}</span>
@@ -405,10 +402,10 @@ export function PresencePage({ setActiveTab }) {
                   selectedLeaveType === 'SAKIT'
                     ? 'Contoh: Demam & flu tinggi. Istirahat di rumah sesuai anjuran dokter.'
                     : selectedLeaveType === 'IZIN'
-                    ? 'Contoh: Menghadiri kegiatan akademik / urusan keluarga mendesak.'
-                    : selectedLeaveType === 'LIBUR NASIONAL'
-                    ? 'Contoh: Hari Libur Nasional Resmi (Tanggal Merah Kalender).'
-                    : 'Contoh: Kantor instansi magang sedang libur internal / maintenance.'
+                      ? 'Contoh: Menghadiri kegiatan akademik / urusan keluarga mendesak.'
+                      : selectedLeaveType === 'LIBUR NASIONAL'
+                        ? 'Contoh: Hari Libur Nasional Resmi (Tanggal Merah Kalender).'
+                        : 'Contoh: Kantor instansi magang sedang libur internal / maintenance.'
                 }
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-amber-500 focus:bg-white transition"
               />
@@ -419,7 +416,7 @@ export function PresencePage({ setActiveTab }) {
               <label className="block text-xs font-bold text-slate-700">
                 Lampiran Foto / Surat Bukti (Opsional)
               </label>
-              
+
               {proofPhoto ? (
                 <div className="relative rounded-2xl overflow-hidden border border-emerald-300 w-48 h-32 bg-slate-100">
                   <img src={proofPhoto} alt="Bukti Izin" className="w-full h-full object-cover" />
@@ -496,7 +493,7 @@ export function PresencePage({ setActiveTab }) {
 
           {/* Layout Grid: Desktop 2 Columns Side-by-Side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
+
             {/* Left Card: Direct Live Embedded Camera Stream */}
             <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 flex flex-col items-center space-y-4">
               <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
@@ -528,11 +525,10 @@ export function PresencePage({ setActiveTab }) {
                     Validasi Geofencing GPS
                   </h2>
                   <span
-                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
-                      inGeofence
+                    className={`text-[10px] font-bold px-3 py-1 rounded-full border ${inGeofence
                         ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                         : 'bg-red-100 text-red-800 border-red-300'
-                    }`}
+                      }`}
                   >
                     {inGeofence ? 'DALAM RADIUS KANTOR' : 'DILUAR RADIUS KANTOR'}
                   </span>
@@ -560,8 +556,8 @@ export function PresencePage({ setActiveTab }) {
                   <div className="flex items-center justify-between text-xs border-t border-slate-200 pt-2">
                     <span className="text-slate-500 font-semibold">Jadwal / Shift Kerja:</span>
                     <span className="font-bold text-blue-800 font-mono">
-                      {settings.scheduleMode === 'SHIFT' 
-                        ? (settings.shifts?.[settings.selectedShift]?.name || 'Shift') 
+                      {settings.scheduleMode === 'SHIFT'
+                        ? (settings.shifts?.[settings.selectedShift]?.name || 'Shift')
                         : 'Reguler'}
                     </span>
                   </div>
@@ -603,13 +599,12 @@ export function PresencePage({ setActiveTab }) {
                     type="button"
                     disabled={submitting || !capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)}
                     onClick={handleSubmitPresence}
-                    className={`w-full py-4 rounded-2xl font-black text-xs shadow-lg transition transform active:scale-98 border flex items-center justify-center gap-2 ${
-                      !capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)
+                    className={`w-full py-4 rounded-2xl font-black text-xs shadow-lg transition transform active:scale-98 border flex items-center justify-center gap-2 ${!capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)
                         ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed shadow-none'
                         : isCheckedIn
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-300 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/20'
-                        : 'bg-gradient-to-r from-blue-500 via-sky-500 to-blue-600 text-white border-amber-300 hover:from-blue-400 hover:to-sky-500 shadow-blue-500/20'
-                    }`}
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-300 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/20'
+                          : 'bg-gradient-to-r from-blue-500 via-sky-500 to-blue-600 text-white border-amber-300 hover:from-blue-400 hover:to-sky-500 shadow-blue-500/20'
+                      }`}
                   >
                     {isCheckedIn ? (
                       <>
@@ -618,8 +613,8 @@ export function PresencePage({ setActiveTab }) {
                           {submitting
                             ? 'Memproses Presensi Pulang...'
                             : isEarlyCheckoutTime
-                            ? `BELUM WAKTU PULANG (AKTIF ${reqCheckOutTimeStr} WIB)`
-                            : 'SUBMIT PRESENSI PULANG SEKARANG'}
+                              ? `BELUM WAKTU PULANG (AKTIF ${reqCheckOutTimeStr} WIB)`
+                              : 'SUBMIT PRESENSI PULANG SEKARANG'}
                         </span>
                       </>
                     ) : (

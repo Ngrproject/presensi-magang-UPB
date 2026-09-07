@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { 
-  BookOpen, CheckCircle2, AlertCircle, Save, 
-  Calendar, FileText, Target, HelpCircle, History 
+import {
+  BookOpen, CheckCircle2, AlertCircle, Save,
+  Calendar, FileText, Target, HelpCircle, History
 } from 'lucide-react';
 
 export function LogbookPage() {
@@ -45,7 +45,7 @@ export function LogbookPage() {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header & Sub-nav */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -59,21 +59,19 @@ export function LogbookPage() {
         <div className="md:hidden flex bg-slate-200 p-1 rounded-2xl border border-slate-300">
           <button
             onClick={() => setActiveView('editor')}
-            className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
-              activeView === 'editor'
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition ${activeView === 'editor'
                 ? 'bg-blue-500 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Form Hari Ini
           </button>
           <button
             onClick={() => setActiveView('history')}
-            className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
-              activeView === 'history'
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition ${activeView === 'history'
                 ? 'bg-blue-500 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Riwayat ({logbooks.length})
           </button>
@@ -82,10 +80,10 @@ export function LogbookPage() {
 
       {/* Grid Layout: Desktop Side-by-Side, Mobile Tab Switching */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Form Editor Column */}
         <div className={`md:col-span-2 space-y-4 ${activeView === 'editor' ? 'block' : 'hidden md:block'}`}>
-          
+
           {/* Status Badge */}
           <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -118,7 +116,7 @@ export function LogbookPage() {
 
           {/* Main Form */}
           <form onSubmit={handleSave} className="space-y-4">
-            
+
             {/* Field 1: Achievements */}
             <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-5 space-y-2">
               <label className="text-xs font-bold text-blue-900 flex items-center gap-2">

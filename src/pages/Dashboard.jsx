@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { 
-  Calendar, Clock, CheckCircle2, AlertTriangle, 
-  MapPin, Camera, BookOpen, ArrowRight, 
+import {
+  Calendar, Clock, CheckCircle2, AlertTriangle,
+  MapPin, Camera, BookOpen, ArrowRight,
   Stethoscope, Mail, Flag, Building2, UserX, ShieldCheck, FileText, Target
 } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export function DashboardPage({ setActiveTab }) {
   const sakitCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'SAKIT').length;
   const izinCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'IZIN').length;
   const liburCount = logs.filter((p) => p && p.isLeave && (p.leaveType === 'LIBUR NASIONAL' || p.leaveType === 'LIBUR INSTANSI')).length;
-  
+
   // Calculate Alpha Count safely
   let alphaCount = 0;
   const workDaysSet = new Set(settings?.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
@@ -92,10 +92,10 @@ export function DashboardPage({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* 3-Column Top Grid Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Card 1: Student Profile */}
         <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 flex items-center gap-4">
           <img
@@ -204,7 +204,7 @@ export function DashboardPage({ setActiveTab }) {
 
       {/* TODAY'S STATUS & YESTERDAY/TODAY LOGBOOK SUMMARY */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Today's Attendance Card */}
         <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4 flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">

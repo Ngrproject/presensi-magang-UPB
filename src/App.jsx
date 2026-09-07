@@ -10,6 +10,7 @@ import { ReportPage } from './pages/Report';
 import { SettingsPage } from './pages/Settings';
 import { ProfilePage } from './pages/Profile';
 import { AdminPage } from './pages/Admin';
+import { BimbinganPage } from './pages/Bimbingan';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -59,17 +60,29 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { currentUser } = useAuth();
   const { settings } = useApp();
-  const [activeTab, setActiveTab] = useState(() => currentUser?.role === 'admin' ? 'admin' : 'dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (currentUser?.role === 'admin') return 'admin';
+    if (currentUser?.role === 'lecturer') return 'bimbingan';
+    return 'dashboard';
+  });
 
-  // Enforce mandatory settings setup on first login/registration for students
+  // Redirect user to appropriate home tab whenever currentUser changes (e.g., login, switch account)
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'admin' && !settings.isConfigured) {
-      setActiveTab('settings');
+    if (currentUser) {
+      if (currentUser.role === 'admin') {
+        setActiveTab('admin');
+      } else if (currentUser.role === 'lecturer') {
+        setActiveTab('bimbingan');
+      } else if (currentUser.role === 'student' && currentUser.isNewUser && !settings.isConfigured) {
+        setActiveTab('settings');
+      } else {
+        setActiveTab('dashboard');
+      }
     }
-  }, [currentUser, settings.isConfigured]);
+  }, [currentUser?.uid, currentUser?.role]);
 
   const handleTabChange = (tabId) => {
-    if (currentUser && currentUser.role !== 'admin' && !settings.isConfigured && tabId !== 'settings') {
+    if (currentUser && currentUser.role === 'student' && currentUser.isNewUser && !settings.isConfigured && tabId !== 'settings') {
       alert('MANDATORY SETUP: Mohon isi dan simpan Konfigurasi Instansi Magang Anda terlebih dahulu!');
       return;
     }
@@ -91,6 +104,7 @@ function AppContent() {
       {activeTab === 'presence' && <PresencePage setActiveTab={handleTabChange} />}
       {activeTab === 'logbook' && <LogbookPage />}
       {activeTab === 'reports' && <ReportPage />}
+      {activeTab === 'bimbingan' && <BimbinganPage />}
       {activeTab === 'settings' && <SettingsPage setActiveTab={handleTabChange} />}
       {activeTab === 'profile' && <ProfilePage />}
     </AppLayout>

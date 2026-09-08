@@ -11,6 +11,7 @@ import { SettingsPage } from './pages/Settings';
 import { ProfilePage } from './pages/Profile';
 import { AdminPage } from './pages/Admin';
 import { BimbinganPage } from './pages/Bimbingan';
+import { StudentChatPage } from './pages/StudentChat';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -105,6 +106,7 @@ function AppContent() {
       {activeTab === 'logbook' && <LogbookPage />}
       {activeTab === 'reports' && <ReportPage />}
       {activeTab === 'bimbingan' && <BimbinganPage />}
+      {activeTab === 'chat' && <StudentChatPage />}
       {activeTab === 'settings' && <SettingsPage setActiveTab={handleTabChange} />}
       {activeTab === 'profile' && <ProfilePage />}
     </AppLayout>

@@ -3,7 +3,7 @@ import { useAuth } from './AuthContext';
 import { isFirebaseConfigured, db } from '../utils/firebase';
 import {
   collection, doc, setDoc, query, where,
-  onSnapshot, getDocs, addDoc
+  onSnapshot, getDocs, addDoc, deleteDoc
 } from 'firebase/firestore';
 
 const AppContext = createContext(null);
@@ -104,6 +104,52 @@ export function AppProvider({ children }) {
 
   const [bimbinganMessages, setBimbinganMessages] = useState(() => {
     const saved = localStorage.getItem('bimbingan_messages_all');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [studentFriends, setStudentFriends] = useState(() => {
+    const saved = localStorage.getItem(`student_friends_${userId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [studentChats, setStudentChats] = useState(() => {
+    const saved = localStorage.getItem('student_chats_all');
+    const parsed = saved ? JSON.parse(saved) : [];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const hour = now.getHours();
+    return parsed.filter(m => {
+      if (!m || !m.timestamp) return false;
+      const mDateStr = m.dateStr || m.timestamp.split('T')[0];
+      if (mDateStr < todayStr) return false;
+      if (hour >= 18) {
+        const mHour = new Date(m.timestamp).getHours();
+        if (mHour < 18) return false;
+      }
+      return true;
+    });
+  });
+
+  const [groupMessages, setGroupMessages] = useState(() => {
+    const saved = localStorage.getItem('group_messages_all');
+    const parsed = saved ? JSON.parse(saved) : [];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const hour = now.getHours();
+    return parsed.filter(m => {
+      if (!m || !m.timestamp) return false;
+      const mDateStr = m.dateStr || m.timestamp.split('T')[0];
+      if (mDateStr < todayStr) return false;
+      if (hour >= 18) {
+        const mHour = new Date(m.timestamp).getHours();
+        if (mHour < 18) return false;
+      }
+      return true;
+    });
+  });
+
+  const [customGroups, setCustomGroups] = useState(() => {
+    const saved = localStorage.getItem('custom_groups_all');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -264,11 +310,70 @@ export function AppProvider({ children }) {
         localStorage.setItem('bimbingan_messages_all', JSON.stringify(list));
       }, (err) => console.log('Firestore bimbingan messages info:', err));
 
+      const studentChatRef = collection(db, 'student_chats');
+      const unsubStudentChats = onSnapshot(studentChatRef, (snap) => {
+        const list = [];
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const currentHour = now.getHours();
+
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const mDateStr = data.dateStr || (data.timestamp ? data.timestamp.split('T')[0] : '');
+          const mHour = data.timestamp ? new Date(data.timestamp).getHours() : 0;
+          const isExpired = mDateStr < todayStr || (currentHour >= 18 && mHour < 18);
+          if (isExpired) {
+            deleteDoc(doc(db, 'student_chats', docSnap.id)).catch(() => {});
+          } else {
+            list.push({ id: docSnap.id, ...data });
+          }
+        });
+        list.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+        setStudentChats(list);
+        localStorage.setItem('student_chats_all', JSON.stringify(list));
+      }, (err) => console.log('Firestore student chats info:', err));
+
+      const groupChatRef = collection(db, 'group_messages');
+      const unsubGroupChats = onSnapshot(groupChatRef, (snap) => {
+        const list = [];
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const currentHour = now.getHours();
+
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const mDateStr = data.dateStr || (data.timestamp ? data.timestamp.split('T')[0] : '');
+          const mHour = data.timestamp ? new Date(data.timestamp).getHours() : 0;
+          const isExpired = mDateStr < todayStr || (currentHour >= 18 && mHour < 18);
+          if (isExpired) {
+            deleteDoc(doc(db, 'group_messages', docSnap.id)).catch(() => {});
+          } else {
+            list.push({ id: docSnap.id, ...data });
+          }
+        });
+        list.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+        setGroupMessages(list);
+        localStorage.setItem('group_messages_all', JSON.stringify(list));
+      }, (err) => console.log('Firestore group messages info:', err));
+
+      const customGroupRef = collection(db, 'custom_groups');
+      const unsubCustomGroups = onSnapshot(customGroupRef, (snap) => {
+        const list = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        setCustomGroups(list);
+        localStorage.setItem('custom_groups_all', JSON.stringify(list));
+      }, (err) => console.log('Firestore custom groups info:', err));
+
       return () => {
         unsubAllPres();
         unsubAllLogs();
         unsubRequests();
         unsubMessages();
+        unsubStudentChats();
+        unsubGroupChats();
+        unsubCustomGroups();
       };
     }
   }, []);
@@ -806,6 +911,195 @@ export function AppProvider({ children }) {
     }
   };
 
+  const addStudentFriendByNim = async (nimInput, allUsersList = []) => {
+    const nim = (nimInput || '').trim();
+    if (!nim) throw new Error('Silakan masukkan NIM teman.');
+    if (currentUser?.studentId === nim) throw new Error('Anda tidak dapat menambahkan NIM sendiri.');
+
+    const targetUser = allUsersList.find(u => u.studentId === nim || u.email?.startsWith(nim));
+    if (!targetUser) {
+      throw new Error(`Mahasiswa dengan NIM "${nim}" tidak ditemukan. Pastikan NIM sudah benar.`);
+    }
+
+    const friendEntry = {
+      uid: targetUser.uid,
+      studentId: targetUser.studentId,
+      name: targetUser.name,
+      email: targetUser.email,
+      avatarUrl: targetUser.avatarUrl,
+      addedAt: new Date().toISOString()
+    };
+
+    setStudentFriends(prev => {
+      if (prev.some(f => f.studentId === targetUser.studentId || f.uid === targetUser.uid)) {
+        return prev;
+      }
+      const updated = [friendEntry, ...prev];
+      localStorage.setItem(`student_friends_${userId}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db && userId && userId !== 'guest') {
+      try {
+        await setDoc(doc(db, 'student_friends', `${userId}_${targetUser.uid}`), {
+          ownerUid: userId,
+          friendUid: targetUser.uid,
+          friendNim: targetUser.studentId,
+          friendName: targetUser.name,
+          addedAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Firestore addStudentFriend error:", err);
+      }
+    }
+
+    return friendEntry;
+  };
+
+  const sendStudentChatMessage = async ({ recipientUid, recipientNim, message }) => {
+    if (!currentUser || !message.trim()) return;
+    const msgId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+    const todayStr = getTodayStr();
+
+    const newMsg = {
+      id: msgId,
+      senderUid: currentUser.uid,
+      senderNim: currentUser.studentId || '',
+      senderName: currentUser.name,
+      recipientUid,
+      recipientNim,
+      message: message.trim(),
+      timestamp: nowIso,
+      dateStr: todayStr
+    };
+
+    setStudentChats(prev => {
+      const updated = [...prev, newMsg];
+      localStorage.setItem('student_chats_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'student_chats', msgId), newMsg);
+      } catch (err) {
+        console.error("Firestore sendStudentChatMessage error:", err);
+      }
+    }
+  };
+
+  const createCustomGroup = async ({ groupName, memberUids = [], memberNims = [] }) => {
+    if (!currentUser || !groupName.trim()) throw new Error('Nama grup tidak boleh kosong.');
+
+    const groupId = `group_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const allMemberUids = Array.from(new Set([currentUser.uid, ...memberUids]));
+    const allMemberNims = Array.from(new Set([currentUser.studentId || '', ...memberNims]));
+
+    const newGroup = {
+      id: groupId,
+      name: groupName.trim(),
+      createdByUid: currentUser.uid,
+      createdByName: currentUser.name,
+      createdByNim: currentUser.studentId || '',
+      memberUids: allMemberUids,
+      memberNims: allMemberNims,
+      createdAt: new Date().toISOString()
+    };
+
+    setCustomGroups(prev => {
+      const updated = [newGroup, ...prev];
+      localStorage.setItem('custom_groups_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'custom_groups', groupId), newGroup);
+      } catch (err) {
+        console.error("Firestore createCustomGroup error:", err);
+      }
+    }
+
+    return newGroup;
+  };
+
+  const sendGroupChatMessage = async ({ groupId, companyName, message }) => {
+    if (!currentUser || !message.trim()) return;
+    const msgId = `grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+    const todayStr = getTodayStr();
+
+    const newMsg = {
+      id: msgId,
+      groupId: groupId || 'default_group',
+      companyName: companyName || settings.companyName || 'Universitas Putra Bangsa (UPB)',
+      senderUid: currentUser.uid,
+      senderNim: currentUser.studentId || '',
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatarUrl || '',
+      message: message.trim(),
+      timestamp: nowIso,
+      dateStr: todayStr
+    };
+
+    setGroupMessages(prev => {
+      const updated = [...prev, newMsg];
+      localStorage.setItem('group_messages_all', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'group_messages', msgId), newMsg);
+      } catch (err) {
+        console.error("Firestore sendGroupChatMessage error:", err);
+      }
+    }
+  };
+
+  const purgeOldStudentChats = () => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentHour = now.getHours();
+
+    setStudentChats(prev => {
+      const valid = prev.filter(msg => {
+        if (!msg || !msg.timestamp) return false;
+        const msgDate = new Date(msg.timestamp);
+        const msgDateStr = msg.dateStr || msgDate.toISOString().split('T')[0];
+        const msgHour = msgDate.getHours();
+
+        if (msgDateStr < todayStr) return false;
+        if (currentHour >= 18 && msgHour < 18) return false;
+        return true;
+      });
+
+      if (valid.length !== prev.length) {
+        localStorage.setItem('student_chats_all', JSON.stringify(valid));
+      }
+      return valid;
+    });
+
+    setGroupMessages(prev => {
+      const valid = prev.filter(msg => {
+        if (!msg || !msg.timestamp) return false;
+        const msgDate = new Date(msg.timestamp);
+        const msgDateStr = msg.dateStr || msgDate.toISOString().split('T')[0];
+        const msgHour = msgDate.getHours();
+
+        if (msgDateStr < todayStr) return false;
+        if (currentHour >= 18 && msgHour < 18) return false;
+        return true;
+      });
+
+      if (valid.length !== prev.length) {
+        localStorage.setItem('group_messages_all', JSON.stringify(valid));
+      }
+      return valid;
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -818,6 +1112,10 @@ export function AppProvider({ children }) {
         auditLogs,
         mentorshipRequests,
         bimbinganMessages,
+        studentFriends,
+        studentChats,
+        groupMessages,
+        customGroups,
         getTodayPresence,
         getTodayLogbook,
         getYesterdayLogbook,
@@ -833,7 +1131,12 @@ export function AppProvider({ children }) {
         requestMentorship,
         respondMentorship,
         adminAssignMentorship,
-        sendBimbinganMessage
+        sendBimbinganMessage,
+        addStudentFriendByNim,
+        sendStudentChatMessage,
+        sendGroupChatMessage,
+        createCustomGroup,
+        purgeOldStudentChats
       }}
     >
       {children}

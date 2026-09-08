@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import {
   Calendar, Clock, CheckCircle2, AlertTriangle,
-  MapPin, Camera, BookOpen, ArrowRight,
+  MapPin, Camera, BookOpen, ArrowRight, MessageSquare,
   Stethoscope, Mail, Flag, Building2, UserX, ShieldCheck, FileText, Target
 } from 'lucide-react';
 

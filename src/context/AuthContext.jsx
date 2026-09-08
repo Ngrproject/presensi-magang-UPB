@@ -49,9 +49,9 @@ export function AuthProvider({ children }) {
   });
   const [allUsers, setAllUsers] = useState(() => {
     const saved = localStorage.getItem('all_registered_users');
-    let parsed = saved ? JSON.parse(saved) : [];
-    if (!parsed.some(u => u.role === 'lecturer')) {
-      parsed = [...parsed, ...DEFAULT_LECTURERS];
+    let parsed = saved !== null ? JSON.parse(saved) : null;
+    if (parsed === null) {
+      parsed = [...DEFAULT_LECTURERS];
       localStorage.setItem('all_registered_users', JSON.stringify(parsed));
     }
     return parsed;
@@ -67,11 +67,6 @@ export function AuthProvider({ children }) {
         const list = [];
         snap.forEach((docSnap) => {
           list.push({ uid: docSnap.id, ...docSnap.data() });
-        });
-        DEFAULT_LECTURERS.forEach(d => {
-          if (!list.some(u => u.uid === d.uid || u.studentId === d.studentId)) {
-            list.push(d);
-          }
         });
         setAllUsers(list);
         localStorage.setItem('all_registered_users', JSON.stringify(list));
@@ -402,15 +397,29 @@ export function AuthProvider({ children }) {
   };
 
   const adminDeleteUser = async (uid) => {
+    const targetUser = allUsers.find(u => u.uid === uid || u.studentId === uid);
+    const targetUid = targetUser?.uid || uid;
+    const targetStudentId = targetUser?.studentId;
+
     setAllUsers((prev) => {
-      const updated = prev.filter(u => u.uid !== uid);
+      const updated = prev.filter(u => 
+        u.uid !== targetUid && 
+        u.uid !== uid && 
+        (!targetStudentId || u.studentId !== targetStudentId)
+      );
       localStorage.setItem('all_registered_users', JSON.stringify(updated));
       return updated;
     });
 
     if (isFirebaseConfigured && db) {
       try {
-        await deleteDoc(doc(db, 'users', uid));
+        await deleteDoc(doc(db, 'users', targetUid));
+        if (targetStudentId && targetStudentId !== targetUid) {
+          await deleteDoc(doc(db, 'users', targetStudentId)).catch(() => {});
+        }
+        if (uid !== targetUid && uid !== targetStudentId) {
+          await deleteDoc(doc(db, 'users', uid)).catch(() => {});
+        }
       } catch (err) {
         console.error("Firestore adminDeleteUser error:", err);
       }

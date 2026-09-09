@@ -8,19 +8,68 @@ import {
 } from 'lucide-react';
 
 export function ReportPage() {
-  const { currentUser } = useAuth();
-  const { settings, presenceLogs, logbooks } = useApp();
+  const { currentUser, allUsers } = useAuth();
+  const { settings, presenceLogs, logbooks, allPresenceLogs, allLogbooks } = useApp();
 
+  const isAdmin = currentUser?.role === 'admin';
+  const studentList = useMemo(() => {
+    return (allUsers || []).filter(u => u.role !== 'admin');
+  }, [allUsers]);
+
+  const [selectedStudentUid, setSelectedStudentUid] = useState('');
   const [reportType, setReportType] = useState('akumulasi'); // 'harian' | 'mingguan' | 'bulanan' | 'akumulasi'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  // Determine target user whose report is being viewed
+  const targetUser = useMemo(() => {
+    if (isAdmin) {
+      if (!selectedStudentUid && studentList.length > 0) {
+        return studentList[0];
+      }
+      return studentList.find(u => u.uid === selectedStudentUid) || studentList[0] || currentUser;
+    }
+    return currentUser;
+  }, [isAdmin, studentList, selectedStudentUid, currentUser]);
+
+  const targetPresences = useMemo(() => {
+    if (isAdmin) {
+      if (!targetUser) return [];
+      return (allPresenceLogs || []).filter(
+        p => p.userId === targetUser.uid || p.studentId === targetUser.studentId
+      );
+    }
+    return presenceLogs || [];
+  }, [isAdmin, allPresenceLogs, presenceLogs, targetUser]);
+
+  const targetLogbooks = useMemo(() => {
+    if (isAdmin) {
+      if (!targetUser) return [];
+      return (allLogbooks || []).filter(
+        l => l.userId === targetUser.uid || l.studentId === targetUser.studentId
+      );
+    }
+    return logbooks || [];
+  }, [isAdmin, allLogbooks, logbooks, targetUser]);
+
+  const targetSettings = useMemo(() => {
+    if (isAdmin && targetUser?.uid) {
+      const saved = localStorage.getItem(`settings_${targetUser.uid}`);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return settings;
+  }, [isAdmin, targetUser, settings]);
 
   // Merge Presences and Logbooks by dateStr
   const mergedData = useMemo(() => {
     const datesMap = new Map();
 
     // Populate from presences
-    (presenceLogs || []).forEach((p) => {
+    (targetPresences || []).forEach((p) => {
       if (!p || !p.dateStr) return;
       datesMap.set(p.dateStr, {
         dateStr: p.dateStr,
@@ -30,7 +79,7 @@ export function ReportPage() {
     });
 
     // Populate from logbooks
-    (logbooks || []).forEach((l) => {
+    (targetLogbooks || []).forEach((l) => {
       if (!l || !l.dateStr) return;
       const existing = datesMap.get(l.dateStr) || { dateStr: l.dateStr, presence: null, logbook: null };
       existing.logbook = l;
@@ -41,7 +90,7 @@ export function ReportPage() {
     const list = Array.from(datesMap.values());
     list.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
     return list;
-  }, [presenceLogs, logbooks]);
+  }, [targetPresences, targetLogbooks]);
 
   // Filtered dataset according to reportType
   const filteredData = useMemo(() => {
@@ -123,6 +172,38 @@ export function ReportPage() {
             <span>DOWNLOAD / CETAK LAPORAN PDF</span>
           </button>
         </div>
+
+        {/* Admin Student Selector Banner */}
+        {isAdmin && (
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-xs shrink-0">
+                <UserCheck className="w-5 h-5 text-amber-300" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-blue-900">MODUL ADMIN: PILIH MAHASISWA MAGANG</h3>
+                <p className="text-[11px] text-blue-700 font-medium">
+                  Pilih akun mahasiswa untuk melihat dan mencetak dokumen resmi Laporan Presensi & Logbook.
+                </p>
+              </div>
+            </div>
+
+            <select
+              value={targetUser?.uid || ''}
+              onChange={(e) => setSelectedStudentUid(e.target.value)}
+              className="px-4 py-2.5 bg-white border-2 border-blue-500 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-700 shadow-xs cursor-pointer min-w-[240px]"
+            >
+              {studentList.map((stu) => (
+                <option key={stu.uid} value={stu.uid}>
+                  {stu.name} (NIM: {stu.studentId})
+                </option>
+              ))}
+              {studentList.length === 0 && (
+                <option value="">Belum ada mahasiswa terdaftar</option>
+              )}
+            </select>
+          </div>
+        )}
 
         {/* Filter Bar */}
         <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -233,25 +314,25 @@ export function ReportPage() {
           <div className="space-y-1.5">
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">Nama Mahasiswa</span>
-              <span className="font-bold text-slate-950">: {currentUser?.name || 'Mahasiswa UPB'}</span>
+              <span className="font-bold text-slate-950">: {targetUser?.name || 'Mahasiswa UPB'}</span>
             </div>
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">NIM Mahasiswa</span>
-              <span className="font-mono font-bold text-blue-900">: {currentUser?.studentId || '210101234'}</span>
+              <span className="font-mono font-bold text-blue-900">: {targetUser?.studentId || '-'}</span>
             </div>
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">Program Studi</span>
-              <span className="font-semibold text-slate-800">: {currentUser?.prodi || 'Informatika / Ilmu Komputer'}</span>
+              <span className="font-semibold text-slate-800">: {targetUser?.prodi || 'Informatika / Ilmu Komputer'}</span>
             </div>
           </div>
           <div className="space-y-1.5">
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">Instansi Magang</span>
-              <span className="font-bold text-slate-950">: {settings?.companyName || 'Belum Dikonfigurasi'}</span>
+              <span className="font-bold text-slate-950">: {targetSettings?.companyName || 'Belum Dikonfigurasi'}</span>
             </div>
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">Periode Magang</span>
-              <span className="font-mono text-slate-800">: {settings?.startDate || '-'} s.d. {settings?.endDate || '-'}</span>
+              <span className="font-mono text-slate-800">: {targetSettings?.startDate || '-'} s.d. {targetSettings?.endDate || '-'}</span>
             </div>
             <div className="flex">
               <span className="w-32 font-bold text-slate-600">Tanggal Cetak</span>
@@ -378,8 +459,8 @@ export function ReportPage() {
               <p className="text-[11px] text-slate-600 font-medium">Mahasiswa Magang</p>
             </div>
             <div>
-              <p className="font-bold underline uppercase">{currentUser?.name || 'Mahasiswa UPB'}</p>
-              <p className="text-[10px] text-slate-500 font-mono">NIM: {currentUser?.studentId || '210101234'}</p>
+              <p className="font-bold underline uppercase">{targetUser?.name || 'Mahasiswa UPB'}</p>
+              <p className="text-[10px] text-slate-500 font-mono">NIM: {targetUser?.studentId || '-'}</p>
             </div>
           </div>
 

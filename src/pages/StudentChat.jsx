@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import {
   MessageSquare, UserPlus, Send, Search, Users,
-  Plus, CheckCircle2, AlertCircle, Sparkles, Check, X
+  Plus, CheckCircle2, AlertCircle, Sparkles, Check, X, ArrowLeft
 } from 'lucide-react';
 
 export function StudentChatPage() {
@@ -23,6 +23,7 @@ export function StudentChatPage() {
   const [activeTabType, setActiveTabType] = useState('group'); // 'group' | 'private'
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedFriendUid, setSelectedFriendUid] = useState('');
+  const [mobileShowChat, setMobileShowChat] = useState(false);
   
   const [privateMessageInput, setPrivateMessageInput] = useState('');
   const [groupMessageInput, setGroupMessageInput] = useState('');
@@ -133,6 +134,7 @@ export function StudentChatPage() {
       showToast(`Berhasil menambahkan ${added.name} (NIM: ${added.studentId}) ke daftar teman!`);
       setSelectedFriendUid(added.uid);
       setActiveTabType('private');
+      setMobileShowChat(true);
       setNimInput('');
       setIsAddFriendModalOpen(false);
     } catch (err) {
@@ -157,6 +159,7 @@ export function StudentChatPage() {
       showToast(`Grup "${created.name}" berhasil dibuat!`);
       setSelectedGroupId(created.id);
       setActiveTabType('group');
+      setMobileShowChat(true);
       setNewGroupName('');
       setSelectedMemberUids([]);
       setIsCreateGroupModalOpen(false);
@@ -276,12 +279,17 @@ export function StudentChatPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
         {/* Left Sidebar: Group / Personal Tabs & Item List */}
-        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-4 shadow-xs space-y-3 flex flex-col h-[620px]">
+        <div className={`lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-4 shadow-xs space-y-3 flex-col h-[620px] ${
+          mobileShowChat ? 'hidden lg:flex' : 'flex'
+        }`}>
           
           {/* Tab Switcher: Grup Diskusi vs Personal */}
           <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200">
             <button
-              onClick={() => setActiveTabType('group')}
+              onClick={() => {
+                setActiveTabType('group');
+                setMobileShowChat(false);
+              }}
               className={`flex-1 py-2 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 ${
                 activeTabType === 'group'
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -293,7 +301,10 @@ export function StudentChatPage() {
             </button>
 
             <button
-              onClick={() => setActiveTabType('private')}
+              onClick={() => {
+                setActiveTabType('private');
+                setMobileShowChat(false);
+              }}
               className={`flex-1 py-2 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1 ${
                 activeTabType === 'private'
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -326,7 +337,10 @@ export function StudentChatPage() {
                   return (
                     <button
                       key={grp.id}
-                      onClick={() => setSelectedGroupId(grp.id)}
+                      onClick={() => {
+                        setSelectedGroupId(grp.id);
+                        setMobileShowChat(true);
+                      }}
                       className={`w-full text-left p-3 rounded-2xl border transition flex items-center gap-3 ${
                         isSelected
                           ? 'bg-blue-50 border-blue-500 shadow-xs'
@@ -378,7 +392,10 @@ export function StudentChatPage() {
                   return (
                     <button
                       key={friend.uid}
-                      onClick={() => setSelectedFriendUid(friend.uid)}
+                      onClick={() => {
+                        setSelectedFriendUid(friend.uid);
+                        setMobileShowChat(true);
+                      }}
                       className={`w-full text-left p-3 rounded-2xl border transition flex items-center gap-3 ${
                         isSelected
                           ? 'bg-blue-50 border-blue-500 shadow-xs'
@@ -410,7 +427,9 @@ export function StudentChatPage() {
         </div>
 
         {/* Right Main Area: Chat Window */}
-        <div className="lg:col-span-3 bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col h-[620px]">
+        <div className={`lg:col-span-3 bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex-col h-[620px] ${
+          mobileShowChat ? 'flex' : 'hidden lg:flex'
+        }`}>
           
           {/* OPTION 1: CUSTOM GROUP CHAT THREAD */}
           {activeTabType === 'group' && activeGroup ? (
@@ -418,6 +437,14 @@ export function StudentChatPage() {
               {/* Header Active Custom Group */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-3">
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setMobileShowChat(false)}
+                    className="lg:hidden p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition flex items-center gap-1 shrink-0"
+                    title="Kembali ke Daftar Chat"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs">Kembali</span>
+                  </button>
                   <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
                     <Users className="w-6 h-6 text-amber-300" />
                   </div>
@@ -504,6 +531,13 @@ export function StudentChatPage() {
             </>
           ) : activeTabType === 'group' ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-3">
+              <button
+                onClick={() => setMobileShowChat(false)}
+                className="lg:hidden px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold mb-2 flex items-center gap-1"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-600" />
+                <span>Kembali ke Daftar Chat</span>
+              </button>
               <Users className="w-12 h-12 text-slate-300" />
               <h3 className="text-sm font-bold text-slate-700">Belum Ada Grup Diskusi</h3>
               <p className="text-xs max-w-xs">
@@ -518,6 +552,14 @@ export function StudentChatPage() {
               {/* Header Active Friend */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-3">
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setMobileShowChat(false)}
+                    className="lg:hidden p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition flex items-center gap-1 shrink-0"
+                    title="Kembali ke Daftar Chat"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs">Kembali</span>
+                  </button>
                   <img
                     src={activeFriend.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
                     alt={activeFriend.name}
@@ -591,6 +633,13 @@ export function StudentChatPage() {
             </>
           ) : activeTabType === 'private' ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-3">
+              <button
+                onClick={() => setMobileShowChat(false)}
+                className="lg:hidden px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold mb-2 flex items-center gap-1"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-600" />
+                <span>Kembali ke Daftar Chat</span>
+              </button>
               <Users className="w-12 h-12 text-slate-300" />
               <h3 className="text-sm font-bold text-slate-700">Pilih Teman untuk Memulai Obrolan</h3>
               <p className="text-xs max-w-xs">

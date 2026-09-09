@@ -16,13 +16,7 @@ export function BottomNav({ activeTab, setActiveTab }) {
   } else if (isAdmin) {
     navItems = [
       { id: 'admin', label: 'Admin', icon: ShieldCheck },
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'presence', label: 'Presensi', icon: Camera },
-      { id: 'logbook', label: 'Logbook', icon: BookOpen },
-      { id: 'reports', label: 'Laporan', icon: FileText },
-      { id: 'bimbingan', label: 'Bimbingan', icon: GraduationCap },
-      { id: 'settings', label: 'Instansi', icon: Settings },
-      { id: 'profile', label: 'Profil', icon: User }
+      { id: 'reports', label: 'Laporan', icon: FileText }
     ];
   } else {
     navItems = [

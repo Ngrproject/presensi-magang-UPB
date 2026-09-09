@@ -413,6 +413,22 @@ export function AppProvider({ children }) {
     return settings.workHours?.checkOutStart || '16:00';
   };
 
+  const getTodayCheckInStartStr = () => {
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const todayName = dayNames[new Date().getDay()];
+
+    if (settings.scheduleMode === 'SHIFT') {
+      const shiftObj = settings.shifts?.[settings.selectedShift];
+      return shiftObj?.start || '08:00';
+    }
+
+    if (settings.useCustomDailyHours && settings.dailyHours?.[todayName]) {
+      return settings.dailyHours[todayName].start || '08:00';
+    }
+
+    return settings.workHours?.checkInStart || '08:00';
+  };
+
   const updateSettings = async (newSettings, changeReason = 'Pembaruan durasi magang') => {
     const oldEndDate = settings.endDate;
     const isEndDateChanged = newSettings.endDate && newSettings.endDate !== oldEndDate;
@@ -1120,6 +1136,7 @@ export function AppProvider({ children }) {
         getTodayLogbook,
         getYesterdayLogbook,
         getTodayRequiredCheckOutStr,
+        getTodayCheckInStartStr,
         getTodayStr,
         addCheckIn,
         addCheckOut,

@@ -3,12 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut, MessageSquare, AlertTriangle } from 'lucide-react';
 import { BottomNav } from './BottomNav';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
+import { useAttendanceNotifications } from '../hooks/useAttendanceNotifications';
 
 export function AppLayout({ children, activeTab, setActiveTab }) {
   const { currentUser, logout } = useAuth();
   const isLecturer = currentUser?.role === 'lecturer';
   const isStudent = currentUser?.role === 'student';
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Activate background PWA attendance notification scheduler
+  useAttendanceNotifications();
 
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-500 selection:text-white relative">

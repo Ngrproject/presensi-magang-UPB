@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useAttendanceNotifications } from '../hooks/useAttendanceNotifications';
 import {
   Building2, MapPin, Lock, Unlock, Clock, Calendar,
   RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info,
-  Layers, Sun, Moon, Sunrise, CalendarDays
+  Layers, Sun, Moon, Sunrise, CalendarDays, BellRing, Send, Smartphone
 } from 'lucide-react';
 
 const ALL_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
@@ -13,6 +14,13 @@ const ALL_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'
 export function SettingsPage({ setActiveTab }) {
   const { settings, updateSettings, auditLogs } = useApp();
   const { updateUserProfile } = useAuth();
+  const {
+    permissionStatus,
+    notificationsEnabled,
+    requestPermission,
+    toggleNotifications,
+    sendTestNotification
+  } = useAttendanceNotifications();
 
   const [companyName, setCompanyName] = useState(settings.companyName || '');
   const [targetLat, setTargetLat] = useState(settings.targetLat ?? -6.2088);
@@ -574,6 +582,68 @@ export function SettingsPage({ setActiveTab }) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Section: Notifikasi PWA Pengingat Presensi */}
+          <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
+            <h2 className="text-sm font-bold text-blue-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <BellRing className="w-5 h-5 text-amber-500" />
+              Notifikasi Pengingat Presensi PWA HP
+            </h2>
+
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span className="text-xs font-bold text-amber-950">Status Notifikasi Perangkat:</span>
+                </div>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${
+                  permissionStatus === 'granted'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : permissionStatus === 'denied'
+                    ? 'bg-red-100 text-red-800 border border-red-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}>
+                  {permissionStatus === 'granted' ? 'DIIZINKAN ✅' : permissionStatus === 'denied' ? 'DITOLAK ❌' : 'BELUM AKTIF ⚠️'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Notifikasi otomatis akan dikirim ke HP Anda:
+                <br />• <strong>15 Menit Sebelum Jam Masuk</strong> (Pengingat Selfie Presensi)
+                <br />• <strong>Tepat Waktu Jam Pulang</strong> (Pengingat Daily Logbook & Pulang)
+              </p>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-200">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="pwaNotificationsToggle"
+                    checked={notificationsEnabled && permissionStatus === 'granted'}
+                    onChange={(e) => {
+                      if (e.target.checked && permissionStatus !== 'granted') {
+                        requestPermission();
+                      } else {
+                        toggleNotifications(e.target.checked);
+                      }
+                    }}
+                    className="rounded accent-amber-600 w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="pwaNotificationsToggle" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    Aktifkan Pengingat Presensi Otomatis
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={sendTestNotification}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition text-white"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Uji Coba Notifikasi HP</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Section 6: Flexible Duration Picker */}

@@ -1,9 +1,10 @@
-const CACHE_NAME = 'epresensi-upb-v1';
+const CACHE_NAME = 'epresensi-upb-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo-upb.png',
+  '/logo-upb-gold.png',
+  '/app-icon.png',
   '/icon-192.png',
   '/icon-512.png',
   '/favicon.svg'
@@ -78,3 +79,52 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Notification Click Event - Open PWA App Window on tap
+self.addEventListener('notificationclick', (event) => {
+  console.log('[ServiceWorker] Notification clicked:', event.notification.tag);
+  event.notification.close();
+
+  const urlToOpen = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Focus existing open PWA window if available
+      for (let client of windowClients) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Or open new window if not open
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+
+// Push Event - Handle Web Push Payload if sent from backend
+self.addEventListener('push', (event) => {
+  let data = { title: 'Pengingat Presensi UPB', body: 'Waktunya presensi!', url: '/' };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [200, 100, 200],
+    data: { url: data.url || '/' },
+    tag: data.tag || 'presensi-notification'
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+

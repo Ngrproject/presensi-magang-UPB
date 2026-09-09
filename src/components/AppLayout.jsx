@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, MessageSquare, AlertTriangle } from 'lucide-react';
 import { BottomNav } from './BottomNav';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 
 export function AppLayout({ children, activeTab, setActiveTab }) {
   const { currentUser, logout } = useAuth();
@@ -11,6 +12,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
 
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-500 selection:text-white relative">
+      <PwaInstallPrompt />
 
       {/* Top Professional Header Navbar */}
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs print:hidden">
@@ -19,7 +21,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
           {/* Logo & Brand: E-PRESENSI MAGANG UPB with Official UPB Emblem */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <img
-              src="/logo-upb.png"
+              src="/logo-upb-gold.png"
               alt="Logo Universitas Putra Bangsa"
               className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs shrink-0"
             />

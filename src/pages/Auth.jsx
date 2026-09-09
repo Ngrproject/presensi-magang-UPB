@@ -32,7 +32,7 @@ export function AuthPage() {
       <div className="text-center mb-6 max-w-md w-full">
         <div className="inline-flex p-3 rounded-3xl bg-white border border-slate-200 shadow-md mb-3">
           <img
-            src="/logo-upb.png"
+            src="/logo-upb-gold.png"
             alt="Logo Universitas Putra Bangsa"
             className="w-16 h-16 object-contain drop-shadow-md"
           />

@@ -279,7 +279,7 @@ export function ReportPage() {
         <div className="border-b-4 border-double border-blue-900 pb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <img
-              src="/logo-upb.png"
+              src="/logo-upb-gold.png"
               alt="Logo UPB"
               className="w-16 h-16 object-contain shrink-0"
             />

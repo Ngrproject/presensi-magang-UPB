@@ -48,11 +48,10 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
                 <button
                   onClick={() => setActiveTab('chat')}
                   title="Ruang Chat Diskusi Mahasiswa"
-                  className={`relative p-2 rounded-xl border transition ${
-                    activeTab === 'chat'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
-                      : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border-slate-200'
-                  }`}
+                  className={`relative p-2 rounded-xl border transition ${activeTab === 'chat'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
+                    : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border-slate-200'
+                    }`}
                 >
                   <MessageSquare className="w-4 h-4 text-amber-500" />
                   <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
@@ -95,10 +94,19 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
         </div>
       </header>
 
-      {/* Main Content Area with Bottom Padding for Bottom Nav */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 print:p-0 print:m-0 print:max-w-none">
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 print:p-0 print:m-0 print:max-w-none">
         {children}
       </main>
+
+      {/* Watermark Footer */}
+      <footer className={`w-full border-t border-slate-200/80 bg-white/50 backdrop-blur-xs py-4 text-center text-xs text-slate-500 font-medium print:hidden ${currentUser ? 'pb-28' : 'pb-8'}`}>
+        <div className="max-w-7xl mx-auto px-4">
+          <p className="tracking-wide">
+            Build By : <span className="font-bold text-slate-700">NGR Media</span> - <span className="font-bold text-blue-900">Universitas Putra Bangsa 2026</span>
+          </p>
+        </div>
+      </footer>
 
       {/* Floating Bottom Navigation Bar for all screens */}
       {currentUser && (

@@ -694,56 +694,115 @@ export function AppProvider({ children }) {
     const targetUserId = presenceData.userId;
     const dateStr = presenceData.dateStr || getTodayStr();
     const recordId = presenceData.id || `pres_${targetUserId}_${dateStr}`;
+    const mode = presenceData.mode || 'BOTH'; // 'CHECKIN_ONLY' | 'CHECKOUT_ONLY' | 'BOTH' | 'LEAVE'
 
-    let status = presenceData.checkInStatus || 'TEPAT WAKTU';
+    // Look for existing presence log for this student and date
+    const existing = allPresenceLogs.find(
+      (p) => p.id === recordId || (p.userId === targetUserId && p.dateStr === dateStr)
+    );
+
+    let status = presenceData.checkInStatus || existing?.checkInStatus || 'TEPAT WAKTU';
     if (status === 'HADIR TEPAT WAKTU' || status === 'HADIR') {
       status = 'TEPAT WAKTU';
+    }
+
+    let finalCheckInTime = null;
+    let finalCheckOutTime = null;
+    let finalCheckInStatus = status;
+    let finalCheckOutStatus = null;
+    let isLeave = false;
+    let leaveType = null;
+    let reason = null;
+
+    if (mode === 'CHECKIN_ONLY') {
+      finalCheckInTime = presenceData.checkInTime || '08:00';
+      finalCheckInStatus = status;
+      finalCheckOutTime = existing?.checkOutTime || null;
+      finalCheckOutStatus = existing?.checkOutStatus || null;
+    } else if (mode === 'CHECKOUT_ONLY') {
+      finalCheckInTime = existing?.checkInTime || null;
+      finalCheckInStatus = existing?.checkInStatus || (existing?.checkInTime ? 'TEPAT WAKTU' : status);
+      finalCheckOutTime = presenceData.checkOutTime || '16:00';
+      finalCheckOutStatus = presenceData.checkOutStatus || 'SELESAI';
+    } else if (mode === 'LEAVE') {
+      isLeave = true;
+      leaveType = presenceData.leaveType || (['IZIN', 'SAKIT', 'ALPA'].includes(status) ? status : 'IZIN');
+      finalCheckInTime = `IZIN (${leaveType})`;
+      finalCheckOutTime = `IZIN (${leaveType})`;
+      finalCheckInStatus = leaveType;
+      finalCheckOutStatus = leaveType;
+      reason = presenceData.notes || presenceData.reason || null;
+    } else {
+      // BOTH
+      finalCheckInTime = presenceData.checkInTime || '08:00';
+      finalCheckOutTime = presenceData.checkOutTime || '16:00';
+      finalCheckInStatus = status;
+      finalCheckOutStatus = presenceData.checkOutStatus || 'SELESAI';
     }
 
     const newRecord = {
       id: recordId,
       userId: targetUserId,
-      studentName: presenceData.studentName || 'Mahasiswa',
-      studentId: presenceData.studentId || '',
+      studentName: presenceData.studentName || existing?.studentName || 'Mahasiswa',
+      studentId: presenceData.studentId || existing?.studentId || '',
       dateStr,
-      checkInTime: presenceData.checkInTime || '08:00',
-      checkOutTime: presenceData.checkOutTime || '16:00',
-      checkInStatus: status,
-      checkOutStatus: presenceData.checkOutStatus || 'SELESAI',
-      notes: presenceData.notes || '',
-      isLeave: Boolean(presenceData.isLeave),
-      leaveType: presenceData.leaveType || null,
-      reason: presenceData.reason || null,
+      checkInTime: finalCheckInTime,
+      checkOutTime: finalCheckOutTime,
+      checkInPhoto: presenceData.checkInPhoto !== undefined ? presenceData.checkInPhoto : (existing?.checkInPhoto || null),
+      checkOutPhoto: presenceData.checkOutPhoto !== undefined ? presenceData.checkOutPhoto : (existing?.checkOutPhoto || null),
+      checkInLocation: presenceData.checkInLocation !== undefined ? presenceData.checkInLocation : (existing?.checkInLocation || null),
+      checkOutLocation: presenceData.checkOutLocation !== undefined ? presenceData.checkOutLocation : (existing?.checkOutLocation || null),
+      checkInStatus: finalCheckInStatus,
+      checkOutStatus: finalCheckOutStatus,
+      notes: presenceData.notes || existing?.notes || '',
+      isLeave,
+      leaveType,
+      reason,
       adminOverride: true,
       updatedAt: new Date().toISOString()
     };
 
-    const targetPresenceKey = `presence_${targetUserId}`;
-    const savedTargetPresences = localStorage.getItem(targetPresenceKey);
-    let targetList = savedTargetPresences ? JSON.parse(savedTargetPresences) : [];
-    const tIdx = targetList.findIndex((p) => p.dateStr === dateStr);
-    if (tIdx >= 0) {
-      targetList[tIdx] = newRecord;
-    } else {
-      targetList.unshift(newRecord);
-    }
-    targetList.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
-    localStorage.setItem(targetPresenceKey, JSON.stringify(targetList));
+    try {
+      const targetPresenceKey = `presence_${targetUserId}`;
+      const savedTargetPresences = localStorage.getItem(targetPresenceKey);
+      let targetList = [];
+      if (savedTargetPresences) {
+        try {
+          targetList = JSON.parse(savedTargetPresences);
+        } catch (e) {
+          targetList = [];
+        }
+      }
+      if (!Array.isArray(targetList)) targetList = [];
+      const tIdx = targetList.findIndex((p) => p.dateStr === dateStr);
+      if (tIdx >= 0) {
+        targetList[tIdx] = newRecord;
+      } else {
+        targetList.unshift(newRecord);
+      }
+      targetList.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+      localStorage.setItem(targetPresenceKey, JSON.stringify(targetList));
 
-    if (targetUserId === userId) {
-      setPresenceLogs(targetList);
+      if (targetUserId === userId) {
+        setPresenceLogs(targetList);
+      }
+    } catch (err) {
+      console.error("Target user presence localstorage error:", err);
     }
 
     setAllPresenceLogs((prev) => {
-      const idx = prev.findIndex((p) => p.id === recordId);
+      const list = Array.isArray(prev) ? prev : [];
+      const idx = list.findIndex((p) => p.id === recordId);
       let updated;
       if (idx >= 0) {
-        updated = [...prev];
+        updated = [...list];
         updated[idx] = newRecord;
       } else {
-        updated = [newRecord, ...prev];
+        updated = [newRecord, ...list];
       }
-      localStorage.setItem('all_presence_logs', JSON.stringify(updated));
+      try {
+        localStorage.setItem('all_presence_logs', JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
 

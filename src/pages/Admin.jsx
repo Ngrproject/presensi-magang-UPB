@@ -49,13 +49,21 @@ export function AdminPage() {
   const [manualForm, setManualForm] = useState({
     userId: '',
     dateStr: getTodayStr(),
+    mode: 'CHECKIN_ONLY', // 'CHECKIN_ONLY' | 'CHECKOUT_ONLY' | 'BOTH' | 'LEAVE'
     checkInTime: '08:00',
     checkOutTime: '16:00',
     checkInStatus: 'TEPAT WAKTU',
+    checkOutStatus: 'SELESAI',
     notes: 'Presensi diinputkan manual oleh Admin',
     isLeave: false,
     leaveType: ''
   });
+
+  const existingPresenceForForm = manualForm.userId
+    ? (allPresenceLogs || []).find(
+        p => p.userId && p.userId === manualForm.userId && p.dateStr === manualForm.dateStr
+      )
+    : null;
 
   const todayStr = getTodayStr();
 
@@ -244,26 +252,24 @@ export function AdminPage() {
         studentName: targetUser.name,
         studentId: targetUser.studentId,
         dateStr: manualForm.dateStr,
+        mode: manualForm.mode,
         checkInTime: manualForm.checkInTime,
         checkOutTime: manualForm.checkOutTime,
         checkInStatus: manualForm.checkInStatus,
-        checkOutStatus: 'SELESAI',
+        checkOutStatus: manualForm.checkOutStatus || 'SELESAI',
         notes: manualForm.notes,
-        isLeave: manualForm.isLeave,
-        leaveType: manualForm.isLeave ? manualForm.leaveType : null,
-        reason: manualForm.isLeave ? manualForm.notes : null
+        isLeave: manualForm.mode === 'LEAVE' || manualForm.isLeave,
+        leaveType: manualForm.mode === 'LEAVE' ? (manualForm.leaveType || manualForm.checkInStatus) : null,
+        reason: manualForm.mode === 'LEAVE' ? manualForm.notes : null
       });
-      showNotification(`Presensi manual untuk ${targetUser.name} tanggal ${manualForm.dateStr} berhasil disimpan!`);
-      setManualForm({
-        userId: '',
-        dateStr: getTodayStr(),
-        checkInTime: '08:00',
-        checkOutTime: '16:00',
-        checkInStatus: 'HADIR TEPAT WAKTU',
-        notes: 'Presensi diinputkan manual oleh Admin',
-        isLeave: false,
-        leaveType: ''
-      });
+
+      let labelText = 'Presensi';
+      if (manualForm.mode === 'CHECKIN_ONLY') labelText = 'Check-In';
+      else if (manualForm.mode === 'CHECKOUT_ONLY') labelText = 'Check-Out';
+      else if (manualForm.mode === 'BOTH') labelText = 'Check-In & Check-Out';
+      else if (manualForm.mode === 'LEAVE') labelText = 'Ketidakhadiran';
+
+      showNotification(`Absen ${labelText} untuk ${targetUser.name} (${manualForm.dateStr}) berhasil disimpan!`);
     } catch (err) {
       showNotification('Gagal menyimpan presensi manual.', 'error');
     }
@@ -537,38 +543,113 @@ export function AdminPage() {
 
       {/* TAB 2: ABSENSIKAN USER (MANUAL) */}
       {activeTab === 'manual' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-5">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm max-w-2xl mx-auto space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
             <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200">
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900">Form Absensikan User (Manual Admin)</h2>
-              <p className="text-xs text-slate-500">Inputkan atau ubah status presensi mahasiswa secara langsung.</p>
+              <p className="text-xs text-slate-500">Pilih opsi untuk mengabsenkan Check-In saja, Check-Out saja, atau keduanya.</p>
             </div>
           </div>
 
-          <form onSubmit={handleManualPresenceSubmit} className="space-y-4">
+          <form onSubmit={handleManualPresenceSubmit} className="space-y-5">
+            {/* Mode Selection Tabs */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Pilih Mahasiswa *
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Pilih Mode Absen Admin *
               </label>
-              <select
-                required
-                value={manualForm.userId}
-                onChange={(e) => setManualForm({ ...manualForm, userId: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
-              >
-                <option value="">-- Pilih Mahasiswa --</option>
-                {allUsers.map((u) => (
-                  <option key={u.uid} value={u.uid}>
-                    {u.name} (NIM: {u.studentId})
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setManualForm({ ...manualForm, mode: 'CHECKIN_ONLY', isLeave: false })}
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
+                    manualForm.mode === 'CHECKIN_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Check-In Saja</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setManualForm({ ...manualForm, mode: 'CHECKOUT_ONLY', isLeave: false })}
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
+                    manualForm.mode === 'CHECKOUT_ONLY'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Check-Out Saja</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setManualForm({ ...manualForm, mode: 'BOTH', isLeave: false })}
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
+                    manualForm.mode === 'BOTH'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Dua-Duanya</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setManualForm({ ...manualForm, mode: 'LEAVE', isLeave: true, leaveType: manualForm.leaveType || 'IZIN' })}
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
+                    manualForm.mode === 'LEAVE'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/20'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Izin / Sakit</span>
+                </button>
+              </div>
             </div>
 
+            {/* Select Student & Date */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Pilih Mahasiswa *
+                </label>
+                <select
+                  required
+                  value={manualForm.userId}
+                  onChange={(e) => {
+                    const selectedUid = e.target.value;
+                    const existing = selectedUid
+                      ? (allPresenceLogs || []).find(p => p.userId === selectedUid && p.dateStr === manualForm.dateStr)
+                      : null;
+                    const cIn = existing?.checkInTime && typeof existing.checkInTime === 'string' && !existing.checkInTime.includes('IZIN') ? existing.checkInTime : '08:00';
+                    const cOut = existing?.checkOutTime && typeof existing.checkOutTime === 'string' && !existing.checkOutTime.includes('IZIN') ? existing.checkOutTime : '16:00';
+                    setManualForm(prev => ({
+                      ...prev,
+                      userId: selectedUid,
+                      checkInTime: cIn,
+                      checkOutTime: cOut,
+                      checkInStatus: existing?.checkInStatus || 'TEPAT WAKTU'
+                    }));
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">-- Pilih Mahasiswa --</option>
+                  {allUsers.map((u) => (
+                    <option key={u.uid} value={u.uid}>
+                      {u.name} (NIM: {u.studentId})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Tanggal Presensi *
@@ -577,65 +658,181 @@ export function AdminPage() {
                   type="date"
                   required
                   value={manualForm.dateStr}
-                  onChange={(e) => setManualForm({ ...manualForm, dateStr: e.target.value })}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    const existing = manualForm.userId
+                      ? (allPresenceLogs || []).find(p => p.userId === manualForm.userId && p.dateStr === newDate)
+                      : null;
+                    const cIn = existing?.checkInTime && typeof existing.checkInTime === 'string' && !existing.checkInTime.includes('IZIN') ? existing.checkInTime : '08:00';
+                    const cOut = existing?.checkOutTime && typeof existing.checkOutTime === 'string' && !existing.checkOutTime.includes('IZIN') ? existing.checkOutTime : '16:00';
+                    setManualForm(prev => ({
+                      ...prev,
+                      dateStr: newDate,
+                      checkInTime: cIn,
+                      checkOutTime: cOut,
+                      checkInStatus: existing?.checkInStatus || 'TEPAT WAKTU'
+                    }));
+                  }}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Status Presensi *
-                </label>
-                <select
-                  value={manualForm.checkInStatus}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const isL = val === 'IZIN' || val === 'SAKIT';
-                    setManualForm({
-                      ...manualForm,
-                      checkInStatus: val,
-                      isLeave: isL,
-                      leaveType: isL ? val : ''
-                    });
-                  }}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500"
-                >
-                  <option value="TEPAT WAKTU">HADIR TEPAT WAKTU</option>
-                  <option value="TERLAMBAT">TERLAMBAT</option>
-                  <option value="IZIN">IZIN</option>
-                  <option value="SAKIT">SAKIT</option>
-                  <option value="ALPA">ALPA</option>
-                </select>
-              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Jam Masuk (Check-In)
-                </label>
-                <input
-                  type="text"
-                  value={manualForm.checkInTime}
-                  onChange={(e) => setManualForm({ ...manualForm, checkInTime: e.target.value })}
-                  placeholder="08:00"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500"
-                />
+            {/* Existing Presence Info Banner if any */}
+            {existingPresenceForForm && (
+              <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-blue-700">
+                  <span>Catatan Presensi Terdeteksi ({existingPresenceForForm.dateStr}):</span>
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono text-slate-700 pt-1">
+                  <span>
+                    <strong>Check-In:</strong> {existingPresenceForForm.checkInTime || 'Belum'} {existingPresenceForForm.checkInStatus ? `(${existingPresenceForForm.checkInStatus})` : ''}
+                  </span>
+                  <span>
+                    <strong>Check-Out:</strong> {existingPresenceForForm.checkOutTime || 'Belum'} {existingPresenceForForm.checkOutStatus ? `(${existingPresenceForForm.checkOutStatus})` : ''}
+                  </span>
+                </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Jam Keluar (Check-Out)
-                </label>
-                <input
-                  type="text"
-                  value={manualForm.checkOutTime}
-                  onChange={(e) => setManualForm({ ...manualForm, checkOutTime: e.target.value })}
-                  placeholder="16:00"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500"
-                />
+            {/* Dynamic Inputs based on mode */}
+            {manualForm.mode === 'CHECKIN_ONLY' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Jam Masuk (Check-In) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={manualForm.checkInTime}
+                    onChange={(e) => setManualForm({ ...manualForm, checkInTime: e.target.value })}
+                    placeholder="08:00"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Status Check-In *
+                  </label>
+                  <select
+                    value={manualForm.checkInStatus}
+                    onChange={(e) => setManualForm({ ...manualForm, checkInStatus: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="TEPAT WAKTU">HADIR TEPAT WAKTU</option>
+                    <option value="TERLAMBAT">TERLAMBAT</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
+
+            {manualForm.mode === 'CHECKOUT_ONLY' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-2xl border border-amber-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Jam Keluar (Check-Out) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={manualForm.checkOutTime}
+                    onChange={(e) => setManualForm({ ...manualForm, checkOutTime: e.target.value })}
+                    placeholder="16:00"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Status Check-Out *
+                  </label>
+                  <select
+                    value={manualForm.checkOutStatus}
+                    onChange={(e) => setManualForm({ ...manualForm, checkOutStatus: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="SELESAI">SELESAI</option>
+                    <option value="TERLAMBAT PULANG">TERLAMBAT PULANG</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {manualForm.mode === 'BOTH' && (
+              <div className="space-y-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Jam Masuk (Check-In) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={manualForm.checkInTime}
+                      onChange={(e) => setManualForm({ ...manualForm, checkInTime: e.target.value })}
+                      placeholder="08:00"
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Jam Keluar (Check-Out) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={manualForm.checkOutTime}
+                      onChange={(e) => setManualForm({ ...manualForm, checkOutTime: e.target.value })}
+                      placeholder="16:00"
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Status Masuk *
+                  </label>
+                  <select
+                    value={manualForm.checkInStatus}
+                    onChange={(e) => setManualForm({ ...manualForm, checkInStatus: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="TEPAT WAKTU">HADIR TEPAT WAKTU</option>
+                    <option value="TERLAMBAT">TERLAMBAT</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {manualForm.mode === 'LEAVE' && (
+              <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Jenis Ketidakhadiran *
+                  </label>
+                  <select
+                    value={manualForm.leaveType || manualForm.checkInStatus}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setManualForm({
+                        ...manualForm,
+                        leaveType: val,
+                        checkInStatus: val
+                      });
+                    }}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="IZIN">IZIN</option>
+                    <option value="SAKIT">SAKIT</option>
+                    <option value="ALPA">ALPA</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -652,9 +849,20 @@ export function AdminPage() {
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/20 border border-amber-300/40 transition transform active:scale-98"
+              className={`w-full py-3.5 rounded-2xl text-white font-black text-xs shadow-lg transition transform active:scale-98 border border-white/20 ${
+                manualForm.mode === 'CHECKIN_ONLY'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-500/20'
+                  : manualForm.mode === 'CHECKOUT_ONLY'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 shadow-amber-500/20'
+                  : manualForm.mode === 'LEAVE'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-purple-500/20'
+                  : 'bg-gradient-to-r from-blue-600 to-sky-600 shadow-blue-500/20'
+              }`}
             >
-              SIMPAN PRESENSI MANUAL MAHASISWA
+              {manualForm.mode === 'CHECKIN_ONLY' && 'SIMPAN ABSEN CHECK-IN MAHASISWA'}
+              {manualForm.mode === 'CHECKOUT_ONLY' && 'SIMPAN ABSEN CHECK-OUT MAHASISWA'}
+              {manualForm.mode === 'BOTH' && 'SIMPAN ABSEN LENGKAP (MASUK & KELUAR)'}
+              {manualForm.mode === 'LEAVE' && 'SIMPAN STATUS KETIDAKHADIRAN MAHASISWA'}
             </button>
           </form>
         </div>

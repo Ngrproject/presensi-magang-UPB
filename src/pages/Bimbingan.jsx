@@ -5,7 +5,7 @@ import {
   GraduationCap, MessageSquare, Paperclip, Send,
   FileText, CheckCircle2, XCircle, Clock, UserCheck,
   Search, Calendar, MapPin, Sparkles, Download, AlertCircle,
-  File, User, Check, X, Eye, BookOpen, Camera
+  File, User, Check, X, Eye, BookOpen, Camera, Image
 } from 'lucide-react';
 
 export function BimbinganPage() {
@@ -32,6 +32,7 @@ export function BimbinganPage() {
   const [selectedStudentUid, setSelectedStudentUid] = useState(null);
   const [lecturerSubTab, setLecturerSubTab] = useState('chat'); // 'chat' | 'presence' | 'logbook'
   const [lecturerMessageInput, setLecturerMessageInput] = useState('');
+  const [previewLogbookPhoto, setPreviewLogbookPhoto] = useState(null);
 
   const lecturersList = allUsers.filter(u => u.role === 'lecturer');
 
@@ -577,6 +578,22 @@ export function BimbinganPage() {
                               <p className="text-xs text-slate-600 whitespace-pre-wrap pl-2 border-l-2 border-amber-400">{log.obstacles}</p>
                             </div>
                           )}
+                          {log.progressPhoto && (
+                            <div className="pt-2 border-t border-slate-200">
+                              <p className="text-[11px] font-bold text-sky-700 flex items-center gap-1">
+                                <Image className="w-3.5 h-3.5 text-sky-500" /> Foto Progress / Dokumentasi:
+                              </p>
+                              <div
+                                onClick={() => setPreviewLogbookPhoto(log.progressPhoto)}
+                                className="mt-1 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-300 cursor-pointer group bg-slate-900 shadow-xs"
+                              >
+                                <img src={log.progressPhoto} alt="Foto Progress" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                  <Eye className="w-4 h-4 text-white" />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
 
@@ -811,6 +828,27 @@ export function BimbinganPage() {
                 <Send className="w-4 h-4" />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PREVIEW FOTO PROGRESS LOGBOOK */}
+      {previewLogbookPhoto && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-3xl w-full flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setPreviewLogbookPhoto(null)}
+              className="absolute -top-10 right-0 text-white hover:text-amber-400 font-bold text-xs flex items-center gap-1 bg-slate-800/80 px-3 py-1.5 rounded-full border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Tutup</span>
+            </button>
+            <img
+              src={previewLogbookPhoto}
+              alt="Foto Progress Logbook"
+              className="max-h-[80vh] w-auto object-contain rounded-2xl border-2 border-white/20 shadow-2xl"
+            />
           </div>
         </div>
       )}

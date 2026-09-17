@@ -5,7 +5,8 @@ import {
   Users, UserPlus, ShieldCheck, MapPin, Unlock,
   Calendar, Clock, Edit3, Trash2, CheckCircle2,
   AlertTriangle, Search, Filter, BookOpen, UserCheck,
-  FileSpreadsheet, ShieldAlert, Sparkles, GraduationCap
+  FileSpreadsheet, ShieldAlert, Sparkles, GraduationCap,
+  Image, Eye, X
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -19,6 +20,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState('users'); // 'users' | 'manual' | 'presences' | 'logbooks'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [previewLogbookPhoto, setPreviewLogbookPhoto] = useState(null);
 
   // Notification / Toast state
   const [notification, setNotification] = useState(null);
@@ -984,6 +986,23 @@ export function AdminPage() {
                       </p>
                     </div>
                   )}
+
+                  {log.progressPhoto && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="font-bold text-sky-700 text-[11px] flex items-center gap-1">
+                        <Image className="w-3.5 h-3.5 text-sky-500" /> Foto Progress / Dokumentasi:
+                      </p>
+                      <div
+                        onClick={() => setPreviewLogbookPhoto(log.progressPhoto)}
+                        className="mt-1.5 relative w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer group bg-slate-900 shadow-xs"
+                      >
+                        <img src={log.progressPhoto} alt="Foto Progress" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                          <Eye className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1183,6 +1202,27 @@ export function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PREVIEW FOTO PROGRESS LOGBOOK */}
+      {previewLogbookPhoto && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-3xl w-full flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setPreviewLogbookPhoto(null)}
+              className="absolute -top-10 right-0 text-white hover:text-amber-400 font-bold text-xs flex items-center gap-1 bg-slate-800/80 px-3 py-1.5 rounded-full border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Tutup</span>
+            </button>
+            <img
+              src={previewLogbookPhoto}
+              alt="Foto Progress Logbook"
+              className="max-h-[80vh] w-auto object-contain rounded-2xl border-2 border-white/20 shadow-2xl"
+            />
           </div>
         </div>
       )}

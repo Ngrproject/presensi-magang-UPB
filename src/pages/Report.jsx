@@ -4,7 +4,8 @@ import { useApp } from '../context/AppContext';
 import {
   FileText, Download, Calendar, Filter,
   CheckCircle2, Clock, Building2, UserCheck,
-  Stethoscope, Mail, Flag, ShieldAlert, Printer
+  Stethoscope, Mail, Flag, ShieldAlert, Printer,
+  Image, Eye, X
 } from 'lucide-react';
 
 export function ReportPage() {
@@ -20,6 +21,7 @@ export function ReportPage() {
   const [reportType, setReportType] = useState('akumulasi'); // 'harian' | 'mingguan' | 'bulanan' | 'akumulasi'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [previewLogbookPhoto, setPreviewLogbookPhoto] = useState(null);
 
   // Determine target user whose report is being viewed
   const targetUser = useMemo(() => {
@@ -402,8 +404,25 @@ export function ReportPage() {
                     <td className="p-2 border border-slate-300 text-center font-bold">
                       {getStatusBadgeText(item)}
                     </td>
-                    <td className="p-2 border border-slate-300">
-                      {item.logbook?.achievements || (item.presence?.reason ? `Izin: ${item.presence.reason}` : '-')}
+                    <td className="p-2 border border-slate-300 space-y-1">
+                      <div>
+                        {item.logbook?.achievements || (item.presence?.reason ? `Izin: ${item.presence.reason}` : '-')}
+                      </div>
+                      {item.logbook?.progressPhoto && (
+                        <div className="pt-1 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewLogbookPhoto(item.logbook.progressPhoto)}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-md print:hidden"
+                          >
+                            <Image className="w-3 h-3 text-sky-500" />
+                            <span>Lihat Foto Progress</span>
+                          </button>
+                          <span className="hidden print:inline text-[9px] font-semibold text-slate-500 italic">
+                            (Ada Foto Dokumentasi)
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="p-2 border border-slate-300 space-y-1">
                       {item.logbook?.obstacles && (
@@ -467,6 +486,27 @@ export function ReportPage() {
         </div>
 
       </div>
+
+      {/* MODAL: PREVIEW FOTO PROGRESS LOGBOOK */}
+      {previewLogbookPhoto && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 print:hidden">
+          <div className="relative max-w-3xl w-full flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setPreviewLogbookPhoto(null)}
+              className="absolute -top-10 right-0 text-white hover:text-amber-400 font-bold text-xs flex items-center gap-1 bg-slate-800/80 px-3 py-1.5 rounded-full border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Tutup</span>
+            </button>
+            <img
+              src={previewLogbookPhoto}
+              alt="Foto Progress Logbook"
+              className="max-h-[80vh] w-auto object-contain rounded-2xl border-2 border-white/20 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

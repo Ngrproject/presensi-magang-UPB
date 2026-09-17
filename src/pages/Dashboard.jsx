@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import {
   Calendar, Clock, CheckCircle2, AlertTriangle,
   MapPin, Camera, BookOpen, ArrowRight, MessageSquare,
-  Stethoscope, Mail, Flag, Building2, UserX, ShieldCheck, FileText, Target
+  Stethoscope, Mail, Flag, Building2, UserX, ShieldCheck, FileText, Target,
+  Image, Eye, X
 } from 'lucide-react';
 
 export function DashboardPage({ setActiveTab }) {
   const { currentUser } = useAuth();
   const { settings, presenceLogs, logbooks, getTodayPresence, getTodayLogbook, getYesterdayLogbook } = useApp();
+
+  const [previewModalPhoto, setPreviewModalPhoto] = useState(null);
 
   const todayPresence = getTodayPresence();
   const todayLogbook = getTodayLogbook();
@@ -273,6 +276,27 @@ export function DashboardPage({ setActiveTab }) {
                 {yesterdayLogbook?.tomorrowPlan || 'Belum ada rencana tugas besok yang ditulis pada logbook kemarin.'}
               </p>
             </div>
+
+            {/* Foto Progress Terakhir */}
+            {(todayLogbook?.progressPhoto || yesterdayLogbook?.progressPhoto || (logbooks.length > 0 && logbooks[0]?.progressPhoto)) && (
+              <div className="p-3 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Image className="w-4 h-4 text-sky-600 shrink-0" />
+                  <div>
+                    <span className="font-bold text-sky-950 block">Foto Progress Kegiatan:</span>
+                    <span className="text-[10px] text-sky-700 font-medium">Dokumentasi terlampir</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewModalPhoto(todayLogbook?.progressPhoto || yesterdayLogbook?.progressPhoto || logbooks[0]?.progressPhoto)}
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Lihat Foto</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -315,6 +339,27 @@ export function DashboardPage({ setActiveTab }) {
           </div>
         )}
       </div>
+
+      {/* MODAL: PREVIEW FOTO PROGRESS LOGBOOK */}
+      {previewModalPhoto && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-3xl w-full flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setPreviewModalPhoto(null)}
+              className="absolute -top-10 right-0 text-white hover:text-amber-400 font-bold text-xs flex items-center gap-1 bg-slate-800/80 px-3 py-1.5 rounded-full border border-white/20"
+            >
+              <X className="w-4 h-4" />
+              <span>Tutup</span>
+            </button>
+            <img
+              src={previewModalPhoto}
+              alt="Foto Progress Logbook"
+              className="max-h-[80vh] w-auto object-contain rounded-2xl border-2 border-white/20 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

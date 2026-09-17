@@ -628,7 +628,7 @@ export function AppProvider({ children }) {
     }
   };
 
-  const saveLogbook = async ({ achievements, obstacles, tomorrowPlan, dateStr = getTodayStr() }) => {
+  const saveLogbook = async ({ achievements, obstacles, tomorrowPlan, progressPhoto, dateStr = getTodayStr() }) => {
     const existing = logbooks.find((l) => l.dateStr === dateStr);
     const logId = existing?.id || `log_${userId}_${dateStr}`;
     const nowIso = new Date().toISOString();
@@ -642,6 +642,7 @@ export function AppProvider({ children }) {
       achievements,
       obstacles,
       tomorrowPlan,
+      progressPhoto: progressPhoto !== undefined ? progressPhoto : (existing?.progressPhoto || null),
       updatedAt: nowIso,
       createdAt: existing?.createdAt || nowIso
     };

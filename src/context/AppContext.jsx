@@ -43,8 +43,9 @@ const DEFAULT_SETTINGS = {
 };
 
 export function AppProvider({ children }) {
-  const { currentUser } = useAuth();
+  const { currentUser, authInitializing } = useAuth();
   const userId = currentUser?.uid || 'guest';
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   const settingsKey = `settings_${userId}`;
   const presenceKey = `presence_${userId}`;
@@ -160,40 +161,60 @@ export function AppProvider({ children }) {
       setPresenceLogs([]);
       setLogbooks([]);
       setAuditLogs([]);
+      setIsDataLoading(false);
       return;
     }
 
+    setIsDataLoading(true);
+
     const savedSet = localStorage.getItem(settingsKey);
     if (savedSet) {
-      const parsed = JSON.parse(savedSet);
-      setSettings({
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        shifts: {
-          ...DEFAULT_SETTINGS.shifts,
-          ...(parsed?.shifts || {})
-        },
-        dailyHours: {
-          ...DEFAULT_SETTINGS.dailyHours,
-          ...(parsed?.dailyHours || {})
-        },
-        workHours: {
-          checkInStart: parsed?.workHours?.checkInStart || '08:00',
-          checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
-        }
-      });
+      try {
+        const parsed = JSON.parse(savedSet);
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          shifts: {
+            ...DEFAULT_SETTINGS.shifts,
+            ...(parsed?.shifts || {})
+          },
+          dailyHours: {
+            ...DEFAULT_SETTINGS.dailyHours,
+            ...(parsed?.dailyHours || {})
+          },
+          workHours: {
+            checkInStart: parsed?.workHours?.checkInStart || '08:00',
+            checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
+          }
+        });
+      } catch (e) {}
     }
 
     const savedPres = localStorage.getItem(presenceKey);
-    if (savedPres) setPresenceLogs(JSON.parse(savedPres));
+    if (savedPres) {
+      try { setPresenceLogs(JSON.parse(savedPres)); } catch (e) {}
+    }
 
     const savedLog = localStorage.getItem(logbooksKey);
-    if (savedLog) setLogbooks(JSON.parse(savedLog));
+    if (savedLog) {
+      try { setLogbooks(JSON.parse(savedLog)); } catch (e) {}
+    }
 
     const savedAudit = localStorage.getItem(auditLogsKey);
-    if (savedAudit) setAuditLogs(JSON.parse(savedAudit));
+    if (savedAudit) {
+      try { setAuditLogs(JSON.parse(savedAudit)); } catch (e) {}
+    }
 
     if (isFirebaseConfigured && db) {
+      let settingsLoaded = false;
+      let presencesLoaded = false;
+
+      const checkLoaded = () => {
+        if (settingsLoaded && presencesLoaded) {
+          setIsDataLoading(false);
+        }
+      };
+
       const settingsRef = doc(db, 'settings', userId);
       const unsubSettings = onSnapshot(settingsRef, (snap) => {
         if (snap.exists()) {
@@ -217,7 +238,13 @@ export function AppProvider({ children }) {
           setSettings(merged);
           localStorage.setItem(settingsKey, JSON.stringify(merged));
         }
-      }, (err) => console.log('Firestore settings listener info:', err));
+        settingsLoaded = true;
+        checkLoaded();
+      }, (err) => {
+        console.log('Firestore settings listener info:', err);
+        settingsLoaded = true;
+        checkLoaded();
+      });
 
       const presencesRef = collection(db, 'presences');
       const qPres = query(presencesRef, where('userId', '==', userId));
@@ -229,7 +256,13 @@ export function AppProvider({ children }) {
         list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
         setPresenceLogs(list);
         localStorage.setItem(presenceKey, JSON.stringify(list));
-      }, (err) => console.log('Firestore presences listener info:', err));
+        presencesLoaded = true;
+        checkLoaded();
+      }, (err) => {
+        console.log('Firestore presences listener info:', err);
+        presencesLoaded = true;
+        checkLoaded();
+      });
 
       const logbooksRef = collection(db, 'logbooks');
       const qLog = query(logbooksRef, where('userId', '==', userId));
@@ -255,12 +288,20 @@ export function AppProvider({ children }) {
         localStorage.setItem(auditLogsKey, JSON.stringify(list));
       }, (err) => console.log('Firestore audit listener info:', err));
 
+      // Safety timeout to ensure loading state resolves even on slow networks
+      const timeoutId = setTimeout(() => {
+        setIsDataLoading(false);
+      }, 2500);
+
       return () => {
+        clearTimeout(timeoutId);
         unsubSettings();
         unsubPresences();
         unsubLogbooks();
         unsubAudit();
       };
+    } else {
+      setIsDataLoading(false);
     }
   }, [userId]);
 
@@ -476,6 +517,13 @@ export function AppProvider({ children }) {
   };
 
   const addCheckIn = async ({ photoDataUrl, userLat, userLon, distance }) => {
+    if (!userId || userId === 'guest') {
+      throw new Error('Gagal mencatat presensi: Sesi pengguna belum teridentifikasi. Silakan tunggu 2 detik atau muat ulang halaman.');
+    }
+    if (isDataLoading) {
+      throw new Error('Gagal mencatat presensi: Data portal sedang disinkronkan dari server. Silakan tunggu 2 detik lalu coba lagi.');
+    }
+
     const todayStr = getTodayStr();
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
 
@@ -540,6 +588,13 @@ export function AppProvider({ children }) {
   };
 
   const addCheckOut = async ({ photoDataUrl, userLat, userLon, distance }) => {
+    if (!userId || userId === 'guest') {
+      throw new Error('Gagal mencatat presensi: Sesi pengguna belum teridentifikasi. Silakan tunggu 2 detik atau muat ulang halaman.');
+    }
+    if (isDataLoading) {
+      throw new Error('Gagal mencatat presensi: Data portal sedang disinkronkan dari server. Silakan tunggu 2 detik lalu coba lagi.');
+    }
+
     const todayLogbook = getTodayLogbook();
     if (!todayLogbook || (!todayLogbook.achievements && !todayLogbook.obstacles)) {
       throw new Error('GUARDRAIL_LOGBOOK_REQUIRED');
@@ -590,6 +645,13 @@ export function AppProvider({ children }) {
   };
 
   const addLeaveRecord = async ({ leaveType, reason, proofDataUrl, dateStr = getTodayStr() }) => {
+    if (!userId || userId === 'guest') {
+      throw new Error('Gagal mencatat izin: Sesi pengguna belum teridentifikasi. Silakan tunggu 2 detik atau muat ulang halaman.');
+    }
+    if (isDataLoading) {
+      throw new Error('Gagal mencatat izin: Data portal sedang disinkronkan dari server. Silakan tunggu 2 detik lalu coba lagi.');
+    }
+
     const recordId = `leave_${userId}_${dateStr}`;
 
     const leaveRecord = {
@@ -1179,6 +1241,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider
       value={{
+        isDataLoading,
         settings,
         updateSettings,
         presenceLogs,

@@ -10,7 +10,7 @@ import {
 
 export function DashboardPage({ setActiveTab }) {
   const { currentUser } = useAuth();
-  const { settings, presenceLogs, logbooks, getTodayPresence, getTodayLogbook, getYesterdayLogbook } = useApp();
+  const { isDataLoading, settings, presenceLogs, logbooks, getTodayPresence, getTodayLogbook, getYesterdayLogbook } = useApp();
 
   const [previewModalPhoto, setPreviewModalPhoto] = useState(null);
 
@@ -42,30 +42,32 @@ export function DashboardPage({ setActiveTab }) {
   const izinCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'IZIN').length;
   const liburCount = logs.filter((p) => p && p.isLeave && (p.leaveType === 'LIBUR NASIONAL' || p.leaveType === 'LIBUR INSTANSI')).length;
 
-  // Calculate Alpha Count safely
+  // Calculate Alpha Count safely (Only after initial data load completes to avoid false Alpha spikes)
   let alphaCount = 0;
-  const workDaysSet = new Set(settings?.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
-  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  if (!isDataLoading) {
+    const workDaysSet = new Set(settings?.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-  try {
-    let curr = new Date(start);
-    let stepCount = 0;
-    while (curr < now && stepCount < 365) {
-      stepCount++;
-      const currTime = curr.getTime();
-      if (isNaN(currTime)) break;
-      const currStr = curr.toISOString().split('T')[0];
-      const dayName = dayNames[curr.getDay()];
-      if (currStr !== todayStr && workDaysSet.has(dayName)) {
-        const rec = logs.find((p) => p && p.dateStr === currStr);
-        if (!rec) {
-          alphaCount++;
+    try {
+      let curr = new Date(start);
+      let stepCount = 0;
+      while (curr < now && stepCount < 365) {
+        stepCount++;
+        const currTime = curr.getTime();
+        if (isNaN(currTime)) break;
+        const currStr = curr.toISOString().split('T')[0];
+        const dayName = dayNames[curr.getDay()];
+        if (currStr !== todayStr && workDaysSet.has(dayName)) {
+          const rec = logs.find((p) => p && p.dateStr === currStr);
+          if (!rec) {
+            alphaCount++;
+          }
         }
+        curr.setDate(curr.getDate() + 1);
       }
-      curr.setDate(curr.getDate() + 1);
+    } catch (err) {
+      console.error("Alpha count calculation safely handled:", err);
     }
-  } catch (err) {
-    console.error("Alpha count calculation safely handled:", err);
   }
 
   const getStatusBadge = (log) => {
@@ -114,7 +116,7 @@ export function DashboardPage({ setActiveTab }) {
               NIM: {currentUser?.studentId || '210101234'}
             </p>
             <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-              {settings?.companyName || 'Belum dikonfigurasi'}
+              {isDataLoading ? 'Memuat instansi...' : (settings?.companyName || 'Belum dikonfigurasi')}
             </p>
           </div>
         </div>
@@ -124,10 +126,10 @@ export function DashboardPage({ setActiveTab }) {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-blue-100 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-amber-300" />
-              Progres Magang ({progressPercent}%)
+              Progres Magang ({isDataLoading ? '--' : progressPercent}%)
             </span>
             <span className="text-[10px] font-extrabold bg-amber-400 text-slate-950 px-2.5 py-1 rounded-full shadow-xs">
-              Sisa {daysLeft} Hari
+              {isDataLoading ? 'Memuat...' : `Sisa ${daysLeft} Hari`}
             </span>
           </div>
 
@@ -135,14 +137,14 @@ export function DashboardPage({ setActiveTab }) {
             <div className="w-full bg-blue-950/40 rounded-full h-3 p-0.5 border border-white/20">
               <div
                 className="bg-gradient-to-r from-amber-300 to-amber-400 h-full rounded-full transition-all duration-500 shadow-xs"
-                style={{ width: `${progressPercent}%` }}
+                style={{ width: `${isDataLoading ? 0 : progressPercent}%` }}
               />
             </div>
           </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-blue-100">
-            <span>Mulai: {settings?.startDate || '-'}</span>
-            <span>Target: {settings?.endDate || '-'}</span>
+            <span>Mulai: {isDataLoading ? '...' : (settings?.startDate || '-')}</span>
+            <span>Target: {isDataLoading ? '...' : (settings?.endDate || '-')}</span>
           </div>
         </div>
 
@@ -173,33 +175,60 @@ export function DashboardPage({ setActiveTab }) {
 
       {/* STATISTIK KEHADIRAN REKAP MAGANG */}
       <div className="bg-white border border-slate-200 shadow-xs rounded-3xl p-6 space-y-4">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-          Rekapitulasi Kehadiran Magang
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            Rekapitulasi Kehadiran Magang
+          </h3>
+          {isDataLoading && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-pulse">
+              ⚡ Menyinkronkan data server...
+            </span>
+          )}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-1">
             <span className="text-xs font-semibold text-emerald-700 block">Hadir</span>
-            <span className="text-xl font-black text-emerald-800 font-mono">{hadirCount}</span>
+            {isDataLoading ? (
+              <div className="h-7 w-10 bg-emerald-200/80 rounded-lg animate-pulse mx-auto my-0.5" />
+            ) : (
+              <span className="text-xl font-black text-emerald-800 font-mono">{hadirCount}</span>
+            )}
             <span className="text-[10px] text-emerald-600 block">Hari</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-center space-y-1">
             <span className="text-xs font-semibold text-red-700 block">Sakit</span>
-            <span className="text-xl font-black text-red-800 font-mono">{sakitCount}</span>
+            {isDataLoading ? (
+              <div className="h-7 w-10 bg-red-200/80 rounded-lg animate-pulse mx-auto my-0.5" />
+            ) : (
+              <span className="text-xl font-black text-red-800 font-mono">{sakitCount}</span>
+            )}
             <span className="text-[10px] text-red-600 block">Hari</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-center space-y-1">
             <span className="text-xs font-semibold text-amber-700 block">Izin</span>
-            <span className="text-xl font-black text-amber-800 font-mono">{izinCount}</span>
+            {isDataLoading ? (
+              <div className="h-7 w-10 bg-amber-200/80 rounded-lg animate-pulse mx-auto my-0.5" />
+            ) : (
+              <span className="text-xl font-black text-amber-800 font-mono">{izinCount}</span>
+            )}
             <span className="text-[10px] text-amber-600 block">Hari</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-center space-y-1">
             <span className="text-xs font-semibold text-sky-700 block">Libur</span>
-            <span className="text-xl font-black text-sky-800 font-mono">{liburCount}</span>
+            {isDataLoading ? (
+              <div className="h-7 w-10 bg-sky-200/80 rounded-lg animate-pulse mx-auto my-0.5" />
+            ) : (
+              <span className="text-xl font-black text-sky-800 font-mono">{liburCount}</span>
+            )}
             <span className="text-[10px] text-sky-600 block">Hari</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-rose-100 border border-rose-300 text-center space-y-1 col-span-2 sm:col-span-1">
             <span className="text-xs font-semibold text-rose-800 block">Alpha</span>
-            <span className="text-xl font-black text-rose-900 font-mono">{alphaCount}</span>
+            {isDataLoading ? (
+              <div className="h-7 w-10 bg-rose-300/80 rounded-lg animate-pulse mx-auto my-0.5" />
+            ) : (
+              <span className="text-xl font-black text-rose-900 font-mono">{alphaCount}</span>
+            )}
             <span className="text-[10px] text-rose-700 block">Hari (Tanpa Ket.)</span>
           </div>
         </div>

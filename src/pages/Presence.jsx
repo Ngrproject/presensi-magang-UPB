@@ -17,7 +17,7 @@ const LEAVE_TYPES = [
 ];
 
 export function PresencePage({ setActiveTab }) {
-  const { settings, getTodayPresence, getTodayLogbook, getTodayRequiredCheckOutStr, addCheckIn, addCheckOut, addLeaveRecord } = useApp();
+  const { isDataLoading, settings, getTodayPresence, getTodayLogbook, getTodayRequiredCheckOutStr, addCheckIn, addCheckOut, addLeaveRecord } = useApp();
   const proofInputRef = useRef(null);
 
   const [activeSubMode, setActiveSubMode] = useState('hadir'); // 'hadir' | 'izin'
@@ -333,6 +333,14 @@ export function PresencePage({ setActiveTab }) {
         </div>
       </div>
 
+      {/* Data Syncing Notice */}
+      {isDataLoading && (
+        <div className="p-4 rounded-3xl bg-blue-50 border border-blue-300 text-blue-900 text-xs flex items-center gap-2 shadow-xs animate-pulse">
+          <Clock className="w-5 h-5 text-blue-600 shrink-0" />
+          <span className="font-bold">⚡ Menyinkronkan data presensi & lokasi dari server... Silakan tunggu sebentar.</span>
+        </div>
+      )}
+
       {/* Success Notice */}
       {successMsg && (
         <div className="p-4 rounded-3xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-center justify-between shadow-xs animate-fade-in">
@@ -444,11 +452,11 @@ export function PresencePage({ setActiveTab }) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={submitting || !leaveReason.trim()}
+              disabled={isDataLoading || submitting || !leaveReason.trim()}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-white font-black text-xs shadow-lg shadow-amber-500/20 border border-amber-300 flex items-center justify-center gap-2 transition transform active:scale-98 disabled:opacity-50"
             >
               <FileText className="w-4 h-4" />
-              <span>{submitting ? 'Memproses Pengajuan...' : `SUBMIT PENGAJUAN ${selectedLeaveType}`}</span>
+              <span>{isDataLoading ? 'MENYINKRONKAN DATA SERVER...' : submitting ? 'Memproses Pengajuan...' : `SUBMIT PENGAJUAN ${selectedLeaveType}`}</span>
             </button>
           </form>
         </div>
@@ -541,7 +549,7 @@ export function PresencePage({ setActiveTab }) {
                       <Building2 className="w-3.5 h-3.5 text-blue-500" />
                       Target Instansi Magang:
                     </span>
-                    <span className="font-bold text-blue-900">{settings.companyName || 'Belum Dikonfigurasi'}</span>
+                    <span className="font-bold text-blue-900">{isDataLoading ? 'Memuat...' : (settings.companyName || 'Belum Dikonfigurasi')}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-semibold">Jarak Real-Time ke Kantor:</span>
@@ -597,16 +605,18 @@ export function PresencePage({ setActiveTab }) {
                 ) : (
                   <button
                     type="button"
-                    disabled={submitting || !capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)}
+                    disabled={isDataLoading || submitting || !capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)}
                     onClick={handleSubmitPresence}
-                    className={`w-full py-4 rounded-2xl font-black text-xs shadow-lg transition transform active:scale-98 border flex items-center justify-center gap-2 ${!capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)
+                    className={`w-full py-4 rounded-2xl font-black text-xs shadow-lg transition transform active:scale-98 border flex items-center justify-center gap-2 ${isDataLoading || !capturedPhoto || !inGeofence || (isCheckedIn && isEarlyCheckoutTime)
                         ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed shadow-none'
                         : isCheckedIn
                           ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-300 hover:from-amber-400 hover:to-orange-500 shadow-amber-500/20'
                           : 'bg-gradient-to-r from-blue-500 via-sky-500 to-blue-600 text-white border-amber-300 hover:from-blue-400 hover:to-sky-500 shadow-blue-500/20'
                       }`}
                   >
-                    {isCheckedIn ? (
+                    {isDataLoading ? (
+                      <span>MENYINKRONKAN DATA SERVER...</span>
+                    ) : isCheckedIn ? (
                       <>
                         <LogOut className="w-4 h-4" />
                         <span>

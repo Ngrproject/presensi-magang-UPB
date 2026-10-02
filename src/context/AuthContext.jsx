@@ -58,6 +58,7 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [authInitializing, setAuthInitializing] = useState(true);
 
   // Firestore snapshot listener for all users
   useEffect(() => {
@@ -80,8 +81,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (isFirebaseConfigured && auth && db) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          try {
+        try {
+          if (user) {
             const userDocRef = doc(db, 'users', user.uid);
             const userSnap = await getDoc(userDocRef);
 
@@ -103,19 +104,23 @@ export function AuthProvider({ children }) {
 
             setCurrentUser(userProfile);
             localStorage.setItem('presensi_user_session', JSON.stringify(userProfile));
-          } catch (err) {
-            console.error("Error fetching user profile from Firestore:", err);
-          }
-        } else {
-          const saved = localStorage.getItem('presensi_user_session');
-          if (saved) {
-            setCurrentUser(JSON.parse(saved));
           } else {
-            setCurrentUser(null);
+            const saved = localStorage.getItem('presensi_user_session');
+            if (saved) {
+              setCurrentUser(JSON.parse(saved));
+            } else {
+              setCurrentUser(null);
+            }
           }
+        } catch (err) {
+          console.error("Error fetching user profile from Firestore:", err);
+        } finally {
+          setAuthInitializing(false);
         }
       });
       return () => unsubscribe();
+    } else {
+      setAuthInitializing(false);
     }
   }, []);
 
@@ -441,6 +446,7 @@ export function AuthProvider({ children }) {
         allUsers,
         loading,
         authError,
+        authInitializing,
         updateUserProfile,
         login,
         register,

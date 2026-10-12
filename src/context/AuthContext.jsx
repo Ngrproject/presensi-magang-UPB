@@ -144,6 +144,125 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const findUserByIdentifier = async (identifierInput) => {
+    const identifier = (identifierInput || '').trim();
+    if (!identifier) return null;
+
+    // 1. Check local allUsers first
+    const localMatch = allUsers.find(
+      (u) =>
+        (u.studentId && u.studentId.trim().toLowerCase() === identifier.toLowerCase()) ||
+        (u.email && u.email.trim().toLowerCase() === identifier.toLowerCase()) ||
+        (u.uid && u.uid === identifier)
+    );
+
+    // 2. If Firebase is configured, check Firestore
+    if (isFirebaseConfigured && db) {
+      try {
+        const usersRef = collection(db, 'users');
+        let q;
+        if (identifier.includes('@')) {
+          q = query(usersRef, where('email', '==', identifier));
+        } else {
+          q = query(usersRef, where('studentId', '==', identifier));
+        }
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          return { uid: docSnap.id, ...docSnap.data() };
+        }
+      } catch (err) {
+        console.warn("Firestore findUserByIdentifier error:", err);
+      }
+    }
+
+    return localMatch || null;
+  };
+
+  const resetPasswordDirectly = async (identifierInput, newPassword) => {
+    setLoading(true);
+    setAuthError(null);
+    const identifier = (identifierInput || '').trim();
+
+    if (!identifier) {
+      setLoading(false);
+      const msg = 'Silakan masukkan NIM atau Email akun Anda.';
+      setAuthError(msg);
+      throw new Error(msg);
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setLoading(false);
+      const msg = 'Kata sandi baru minimal harus 6 karakter.';
+      setAuthError(msg);
+      throw new Error(msg);
+    }
+
+    try {
+      const targetUser = await findUserByIdentifier(identifier);
+
+      if (!targetUser) {
+        const msg = `Akun dengan NIM atau Email "${identifier}" tidak ditemukan. Pastikan data sudah benar.`;
+        setAuthError(msg);
+        throw new Error(msg);
+      }
+
+      const targetUid = targetUser.uid;
+      const updatedFields = {
+        password: newPassword,
+        passwordUpdatedAt: new Date().toISOString()
+      };
+
+      // 1. Update in Firestore if configured
+      if (isFirebaseConfigured && db && targetUid) {
+        try {
+          await setDoc(doc(db, 'users', targetUid), updatedFields, { merge: true });
+        } catch (dbErr) {
+          console.error("Firestore password update error:", dbErr);
+        }
+      }
+
+      // 2. Update local state and localStorage
+      setAllUsers((prev) => {
+        const updated = prev.map((u) => {
+          if (
+            u.uid === targetUid ||
+            (u.studentId && targetUser.studentId && u.studentId.toLowerCase() === targetUser.studentId.toLowerCase()) ||
+            (u.email && targetUser.email && u.email.toLowerCase() === targetUser.email.toLowerCase())
+          ) {
+            return { ...u, ...updatedFields };
+          }
+          return u;
+        });
+        localStorage.setItem('all_registered_users', JSON.stringify(updated));
+        return updated;
+      });
+
+      // 3. Update current session if matching
+      const savedSession = localStorage.getItem('presensi_user_session');
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.uid === targetUid || parsed.studentId === targetUser.studentId) {
+          const updatedSession = { ...parsed, ...updatedFields };
+          localStorage.setItem('presensi_user_session', JSON.stringify(updatedSession));
+          if (currentUser?.uid === targetUid) {
+            setCurrentUser(updatedSession);
+          }
+        }
+      }
+
+      return {
+        success: true,
+        user: { ...targetUser, ...updatedFields }
+      };
+    } catch (err) {
+      console.error("resetPasswordDirectly error:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const login = async (identifierInput, password) => {
     setLoading(true);
     setAuthError(null);
@@ -158,6 +277,7 @@ export function AuthProvider({ children }) {
     try {
       if (isFirebaseConfigured && auth && db) {
         let targetEmail = identifier;
+        let matchedDocData = null;
 
         // If identifier is NIM (does not contain @), search Firestore for user email
         if (!identifier.includes('@')) {
@@ -168,6 +288,7 @@ export function AuthProvider({ children }) {
 
             if (!querySnapshot.empty) {
               const matchedData = querySnapshot.docs[0].data();
+              matchedDocData = { uid: querySnapshot.docs[0].id, ...matchedData };
               if (matchedData.email) {
                 targetEmail = matchedData.email;
               } else {
@@ -180,16 +301,38 @@ export function AuthProvider({ children }) {
             console.warn("NIM lookup in Firestore failed, using default domain fallback:", queryErr);
             targetEmail = `${identifier}@students.upb.ac.id`;
           }
+        } else {
+          try {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', identifier));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              matchedDocData = { uid: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+            }
+          } catch {
+            // Optional catch binding
+          }
         }
 
-        let userCred;
+        let userCred = null;
+        let bypassFirebaseWithFirestore = false;
         const isAdminAccount = identifier.toLowerCase().includes('admin') || targetEmail.toLowerCase().includes('admin');
         const isLecturerAccount = identifier.toLowerCase().includes('dosen') || targetEmail.toLowerCase().includes('dosen');
 
         try {
           userCred = await signInWithEmailAndPassword(auth, targetEmail, password);
         } catch (signErr) {
-          if (isAdminAccount && (signErr.code === 'auth/user-not-found' || signErr.code === 'auth/invalid-credential')) {
+          // Check if user has reset password directly in Firestore or allUsers
+          const fallbackUser = matchedDocData || allUsers.find(
+            (u) =>
+              (u.studentId && u.studentId.toLowerCase() === identifier.toLowerCase()) ||
+              (u.email && u.email.toLowerCase() === targetEmail.toLowerCase()) ||
+              (u.email && u.email.toLowerCase() === identifier.toLowerCase())
+          );
+
+          if (fallbackUser && fallbackUser.password && fallbackUser.password === password) {
+            bypassFirebaseWithFirestore = true;
+          } else if (isAdminAccount && (signErr.code === 'auth/user-not-found' || signErr.code === 'auth/invalid-credential')) {
             try {
               userCred = await createUserWithEmailAndPassword(auth, targetEmail, password);
             } catch (createErr) {
@@ -201,30 +344,45 @@ export function AuthProvider({ children }) {
           }
         }
 
-        const userDocRef = doc(db, 'users', userCred.user.uid);
-        const userSnap = await getDoc(userDocRef);
-
         let userProfile;
-        if (userSnap.exists()) {
-          const data = userSnap.data();
+        if (bypassFirebaseWithFirestore) {
+          const fallbackUser = matchedDocData || allUsers.find(
+            (u) =>
+              (u.studentId && u.studentId.toLowerCase() === identifier.toLowerCase()) ||
+              (u.email && u.email.toLowerCase() === targetEmail.toLowerCase()) ||
+              (u.email && u.email.toLowerCase() === identifier.toLowerCase())
+          );
           userProfile = {
-            uid: userCred.user.uid,
-            role: data.role || (isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student'),
-            ...data,
+            uid: fallbackUser.uid || `user_${identifier}`,
+            role: fallbackUser.role || (isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student'),
+            ...fallbackUser,
             isNewUser: false
           };
         } else {
-          userProfile = {
-            uid: userCred.user.uid,
-            email: userCred.user.email,
-            studentId: identifier.includes('@') ? userCred.user.email.split('@')[0] : identifier,
-            name: isAdminAccount ? 'Administrator UPB' : isLecturerAccount ? `Dosen Pembimbing (${identifier})` : `Mahasiswa (${identifier})`,
-            university: 'Universitas Putra Bangsa (UPB)',
-            role: isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student',
-            avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-            isNewUser: true
-          };
-          await setDoc(userDocRef, userProfile);
+          const userDocRef = doc(db, 'users', userCred.user.uid);
+          const userSnap = await getDoc(userDocRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            userProfile = {
+              uid: userCred.user.uid,
+              role: data.role || (isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student'),
+              ...data,
+              isNewUser: false
+            };
+          } else {
+            userProfile = {
+              uid: userCred.user.uid,
+              email: userCred.user.email,
+              studentId: identifier.includes('@') ? userCred.user.email.split('@')[0] : identifier,
+              name: isAdminAccount ? 'Administrator UPB' : isLecturerAccount ? `Dosen Pembimbing (${identifier})` : `Mahasiswa (${identifier})`,
+              university: 'Universitas Putra Bangsa (UPB)',
+              role: isAdminAccount ? 'admin' : isLecturerAccount ? 'lecturer' : 'student',
+              avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+              isNewUser: true
+            };
+            await setDoc(userDocRef, userProfile);
+          }
         }
 
         setCurrentUser(userProfile);
@@ -237,8 +395,16 @@ export function AuthProvider({ children }) {
         
         // Match existing user in allUsers by studentId/NIDN, email, or uid
         const existingMatched = allUsers.find(
-          u => u.studentId === identifier || u.email === identifier || u.uid === identifier
+          u => (u.studentId && u.studentId.toLowerCase() === identifier.toLowerCase()) ||
+               (u.email && u.email.toLowerCase() === identifier.toLowerCase()) ||
+               u.uid === identifier
         );
+
+        if (existingMatched && existingMatched.password && existingMatched.password !== password) {
+          const wrongErr = new Error('Password salah');
+          wrongErr.code = 'auth/wrong-password';
+          throw wrongErr;
+        }
 
         const loggedUser = existingMatched || {
           uid: isAdminAccount ? 'user_admin_default' : isLecturerAccount ? `user_dosen_${identifier}` : `user_${identifier}`,
@@ -267,13 +433,15 @@ export function AuthProvider({ children }) {
       console.error("Login error:", err);
       let customMsg = 'Login gagal. Periksa kembali NIM/Email dan Password Anda.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
-        customMsg = 'NIM/Email atau Password belum terdaftar / salah. Silakan klik "Daftar Akun Baru" jika belum memiliki akun.';
+        customMsg = 'NIM/Email atau Password belum terdaftar / salah. Silakan klik "Daftar Akun Baru" atau gunakan fitur "Lupa Password" jika Anda lupa kata sandi.';
       } else if (err.code === 'auth/wrong-password') {
-        customMsg = 'Password yang Anda masukkan salah.';
+        customMsg = 'Password yang Anda masukkan salah. Klik "Lupa Password?" jika ingin mengganti kata sandi secara langsung.';
       } else if (err.code === 'auth/invalid-email') {
         customMsg = 'Format Email / NIM tidak valid.';
       } else if (err.code === 'auth/too-many-requests') {
         customMsg = 'Terlalu banyak percobaan login. Silakan tunggu beberapa saat lagi.';
+      } else if (err.message) {
+        customMsg = err.message;
       }
       setAuthError(customMsg);
       throw err;
@@ -294,6 +462,7 @@ export function AuthProvider({ children }) {
         role: 'student',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
         isNewUser: true,
+        password: password,
         createdAt: new Date().toISOString()
       };
 
@@ -450,6 +619,8 @@ export function AuthProvider({ children }) {
         updateUserProfile,
         login,
         register,
+        resetPasswordDirectly,
+        findUserByIdentifier,
         adminAddUser,
         adminUpdateUser,
         adminDeleteUser,

@@ -12,7 +12,6 @@ import {
   EyeOff,
   CheckCircle2,
   ArrowLeft,
-  Sparkles,
   Search,
   Check
 } from 'lucide-react';
@@ -229,17 +228,6 @@ export function AuthPage() {
           <div>
             {!resetSuccess ? (
               <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-                {/* Information Header */}
-                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 to-blue-50 border border-amber-200 text-xs text-slate-700 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                    <span>Ganti Password Langsung</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                    Lupa password akun Anda? Masukkan NIM atau Email terdaftar untuk langsung mengganti kata sandi baru tanpa menunggu email.
-                  </p>
-                </div>
-
                 {forgotError && (
                   <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />

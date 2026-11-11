@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useAttendanceNotifications } from '../hooks/useAttendanceNotifications';
+import { getLocalDateStr } from '../utils/date';
 import {
   Building2, MapPin, Lock, Unlock, Clock, Calendar,
   RotateCcw, ShieldCheck, History, Save, AlertTriangle, Check, Navigation, Info,
@@ -56,7 +57,7 @@ export function SettingsPage({ setActiveTab }) {
   });
 
   // Period & Duration
-  const [startDate, setStartDate] = useState(settings.startDate || new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(settings.startDate || getLocalDateStr());
   const [durationMonths, setDurationMonths] = useState(settings.durationMonths || 3);
   const [customEndDate, setCustomEndDate] = useState(settings.endDate || '2026-11-01');
   const [useCustomEndDate, setUseCustomEndDate] = useState(false);
@@ -130,7 +131,7 @@ export function SettingsPage({ setActiveTab }) {
     if (!start) return '';
     const d = new Date(start);
     d.setMonth(d.getMonth() + Number(months));
-    return d.toISOString().split('T')[0];
+    return getLocalDateStr(d);
   };
 
   const computedEnd = useCustomEndDate ? customEndDate : computeEndDate(startDate, durationMonths);

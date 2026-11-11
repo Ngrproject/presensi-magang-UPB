@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { getLocalDateStr, getLocalMonthStr } from '../utils/date';
 import {
-  FileText, Download, Calendar, Filter,
-  CheckCircle2, Clock, Building2, UserCheck,
-  Stethoscope, Mail, Flag, ShieldAlert, Printer,
-  Image, Eye, X
+  Printer, Image, X, UserCheck
 } from 'lucide-react';
 
 export function ReportPage() {
@@ -19,8 +17,8 @@ export function ReportPage() {
 
   const [selectedStudentUid, setSelectedStudentUid] = useState('');
   const [reportType, setReportType] = useState('akumulasi'); // 'harian' | 'mingguan' | 'bulanan' | 'akumulasi'
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(getLocalDateStr());
+  const [selectedMonth, setSelectedMonth] = useState(getLocalMonthStr());
   const [previewLogbookPhoto, setPreviewLogbookPhoto] = useState(null);
 
   // Determine target user whose report is being viewed
@@ -60,7 +58,7 @@ export function ReportPage() {
       if (saved) {
         try {
           return JSON.parse(saved);
-        } catch (e) {}
+        } catch {}
       }
     }
     return settings;
@@ -394,11 +392,48 @@ export function ReportPage() {
                     <td className="p-2 border border-slate-300 font-mono font-semibold">{item.dateStr}</td>
                     <td className="p-2 border border-slate-300 text-center font-mono">
                       {item.presence?.isLeave ? (
-                        <span className="text-[10px] font-bold text-amber-700">IZIN</span>
+                        <div>
+                          <span className="text-[10px] font-bold text-amber-700">IZIN</span>
+                          {item.presence?.proofPhoto && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewLogbookPhoto(item.presence.proofPhoto)}
+                              className="block mx-auto mt-1 text-[9px] text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded print:hidden font-sans font-bold"
+                            >
+                              Surat Bukti
+                            </button>
+                          )}
+                        </div>
                       ) : (
-                        <span>
-                          {item.presence?.checkInTime || '--:--'} - {item.presence?.checkOutTime || '--:--'}
-                        </span>
+                        <div>
+                          <span>
+                            {item.presence?.checkInTime || '--:--'} - {item.presence?.checkOutTime || '--:--'}
+                          </span>
+                          {(item.presence?.checkInPhoto || item.presence?.checkOutPhoto) && (
+                            <div className="flex items-center justify-center gap-1 mt-1 print:hidden font-sans">
+                              {item.presence?.checkInPhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewLogbookPhoto(item.presence.checkInPhoto)}
+                                  className="text-[9px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-1.5 py-0.5 rounded"
+                                  title="Lihat Foto Masuk"
+                                >
+                                  Foto Masuk
+                                </button>
+                              )}
+                              {item.presence?.checkOutPhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewLogbookPhoto(item.presence.checkOutPhoto)}
+                                  className="text-[9px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded"
+                                  title="Lihat Foto Pulang"
+                                >
+                                  Foto Pulang
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="p-2 border border-slate-300 text-center font-bold">

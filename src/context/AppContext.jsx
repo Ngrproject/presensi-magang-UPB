@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { isFirebaseConfigured, db } from '../utils/firebase';
+import { getLocalDateStr } from '../utils/date';
 import {
   collection, doc, setDoc, query, where,
   onSnapshot, getDocs, addDoc, deleteDoc
@@ -35,9 +36,9 @@ const DEFAULT_SETTINGS = {
     Minggu: { start: '08:00', end: '12:00' }
   },
   workDays: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
-  startDate: new Date().toISOString().split('T')[0],
+  startDate: getLocalDateStr(),
   durationMonths: 3,
-  endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  endDate: getLocalDateStr(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)),
   isLocked: false,
   isConfigured: false
 };
@@ -117,11 +118,11 @@ export function AppProvider({ children }) {
     const saved = localStorage.getItem('student_chats_all');
     const parsed = saved ? JSON.parse(saved) : [];
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateStr(now);
     const hour = now.getHours();
     return parsed.filter(m => {
       if (!m || !m.timestamp) return false;
-      const mDateStr = m.dateStr || m.timestamp.split('T')[0];
+      const mDateStr = m.dateStr || getLocalDateStr(m.timestamp);
       if (mDateStr < todayStr) return false;
       if (hour >= 18) {
         const mHour = new Date(m.timestamp).getHours();
@@ -135,11 +136,11 @@ export function AppProvider({ children }) {
     const saved = localStorage.getItem('group_messages_all');
     const parsed = saved ? JSON.parse(saved) : [];
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateStr(now);
     const hour = now.getHours();
     return parsed.filter(m => {
       if (!m || !m.timestamp) return false;
-      const mDateStr = m.dateStr || m.timestamp.split('T')[0];
+      const mDateStr = m.dateStr || getLocalDateStr(m.timestamp);
       if (mDateStr < todayStr) return false;
       if (hour >= 18) {
         const mHour = new Date(m.timestamp).getHours();
@@ -355,12 +356,12 @@ export function AppProvider({ children }) {
       const unsubStudentChats = onSnapshot(studentChatRef, (snap) => {
         const list = [];
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = getLocalDateStr(now);
         const currentHour = now.getHours();
 
         snap.forEach((docSnap) => {
           const data = docSnap.data();
-          const mDateStr = data.dateStr || (data.timestamp ? data.timestamp.split('T')[0] : '');
+          const mDateStr = data.dateStr || (data.timestamp ? getLocalDateStr(data.timestamp) : '');
           const mHour = data.timestamp ? new Date(data.timestamp).getHours() : 0;
           const isExpired = mDateStr < todayStr || (currentHour >= 18 && mHour < 18);
           if (isExpired) {
@@ -378,12 +379,12 @@ export function AppProvider({ children }) {
       const unsubGroupChats = onSnapshot(groupChatRef, (snap) => {
         const list = [];
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = getLocalDateStr(now);
         const currentHour = now.getHours();
 
         snap.forEach((docSnap) => {
           const data = docSnap.data();
-          const mDateStr = data.dateStr || (data.timestamp ? data.timestamp.split('T')[0] : '');
+          const mDateStr = data.dateStr || (data.timestamp ? getLocalDateStr(data.timestamp) : '');
           const mHour = data.timestamp ? new Date(data.timestamp).getHours() : 0;
           const isExpired = mDateStr < todayStr || (currentHour >= 18 && mHour < 18);
           if (isExpired) {
@@ -419,7 +420,7 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getTodayStr = () => getLocalDateStr(new Date());
 
   const getTodayPresence = () => {
     const today = getTodayStr();
@@ -434,7 +435,7 @@ export function AppProvider({ children }) {
   const getYesterdayLogbook = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    const yesterdayStr = d.toISOString().split('T')[0];
+    const yesterdayStr = getLocalDateStr(d);
     return logbooks.find((l) => l.dateStr === yesterdayStr) || null;
   };
 
@@ -1198,14 +1199,14 @@ export function AppProvider({ children }) {
 
   const purgeOldStudentChats = () => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateStr(now);
     const currentHour = now.getHours();
 
     setStudentChats(prev => {
       const valid = prev.filter(msg => {
         if (!msg || !msg.timestamp) return false;
         const msgDate = new Date(msg.timestamp);
-        const msgDateStr = msg.dateStr || msgDate.toISOString().split('T')[0];
+        const msgDateStr = msg.dateStr || getLocalDateStr(msgDate);
         const msgHour = msgDate.getHours();
 
         if (msgDateStr < todayStr) return false;
@@ -1223,7 +1224,7 @@ export function AppProvider({ children }) {
       const valid = prev.filter(msg => {
         if (!msg || !msg.timestamp) return false;
         const msgDate = new Date(msg.timestamp);
-        const msgDateStr = msg.dateStr || msgDate.toISOString().split('T')[0];
+        const msgDateStr = msg.dateStr || getLocalDateStr(msgDate);
         const msgHour = msgDate.getHours();
 
         if (msgDateStr < todayStr) return false;

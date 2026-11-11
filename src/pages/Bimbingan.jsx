@@ -4,8 +4,8 @@ import { useApp } from '../context/AppContext';
 import {
   GraduationCap, MessageSquare, Paperclip, Send,
   FileText, CheckCircle2, XCircle, Clock, UserCheck,
-  Search, Calendar, MapPin, Sparkles, Download, AlertCircle,
-  File, User, Check, X, Eye, BookOpen, Camera, Image
+  Download,
+  Check, X, Eye, BookOpen, Camera, Image
 } from 'lucide-react';
 
 export function BimbinganPage() {
@@ -509,8 +509,9 @@ export function BimbinganPage() {
                         <thead>
                           <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b">
                             <th className="p-3">Tanggal</th>
-                            <th className="p-3">Foto Selfie</th>
+                            <th className="p-3 text-center">Foto Cek In</th>
                             <th className="p-3">Masuk</th>
+                            <th className="p-3 text-center">Foto Cek Out</th>
                             <th className="p-3">Keluar</th>
                             <th className="p-3">Status</th>
                           </tr>
@@ -518,17 +519,64 @@ export function BimbinganPage() {
                         <tbody className="divide-y divide-slate-100">
                           {targetStudentPresences.map((p) => (
                             <tr key={p.id} className="hover:bg-slate-50">
-                              <td className="p-3 font-mono font-bold text-slate-700">{p.dateStr}</td>
-                              <td className="p-3">
-                                {p.checkInPhoto ? (
-                                  <img src={p.checkInPhoto} alt="Selfie" className="w-10 h-10 rounded-xl object-cover border" />
+                              <td className="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">{p.dateStr}</td>
+                              
+                              {/* Foto Cek In */}
+                              <td className="p-3 text-center">
+                                {p.isLeave && p.proofPhoto ? (
+                                  <div
+                                    onClick={() => setPreviewLogbookPhoto(p.proofPhoto)}
+                                    className="relative w-10 h-10 mx-auto rounded-xl overflow-hidden border border-purple-200 cursor-pointer group shadow-xs bg-purple-950"
+                                    title="Klik untuk melihat bukti izin"
+                                  >
+                                    <img src={p.proofPhoto} alt="Bukti Izin" className="w-full h-full object-cover group-hover:scale-110 transition" />
+                                    <div className="absolute inset-0 bg-purple-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                      <Eye className="w-3.5 h-3.5 text-white" />
+                                    </div>
+                                  </div>
+                                ) : p.checkInPhoto ? (
+                                  <div
+                                    onClick={() => setPreviewLogbookPhoto(p.checkInPhoto)}
+                                    className="relative w-10 h-10 mx-auto rounded-xl overflow-hidden border border-slate-200 cursor-pointer group shadow-xs bg-slate-900"
+                                    title="Klik untuk melihat Foto Masuk"
+                                  >
+                                    <img src={p.checkInPhoto} alt="Foto Cek In" className="w-full h-full object-cover group-hover:scale-110 transition" />
+                                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                      <Eye className="w-3.5 h-3.5 text-white" />
+                                    </div>
+                                  </div>
                                 ) : (
                                   <span className="text-[10px] text-slate-400">Tidak ada</span>
                                 )}
                               </td>
+
                               <td className="p-3 font-mono">{p.checkInTime || '-'}</td>
+
+                              {/* Foto Cek Out */}
+                              <td className="p-3 text-center">
+                                {p.checkOutPhoto ? (
+                                  <div
+                                    onClick={() => setPreviewLogbookPhoto(p.checkOutPhoto)}
+                                    className="relative w-10 h-10 mx-auto rounded-xl overflow-hidden border border-slate-200 cursor-pointer group shadow-xs bg-slate-900"
+                                    title="Klik untuk melihat Foto Pulang"
+                                  >
+                                    <img src={p.checkOutPhoto} alt="Foto Cek Out" className="w-full h-full object-cover group-hover:scale-110 transition" />
+                                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                      <Eye className="w-3.5 h-3.5 text-white" />
+                                    </div>
+                                  </div>
+                                ) : !p.checkOutTime ? (
+                                  <span className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                                    Belum Pulang
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400">Tidak ada</span>
+                                )}
+                              </td>
+
                               <td className="p-3 font-mono">{p.checkOutTime || '-'}</td>
-                              <td className="p-3">
+                              
+                              <td className="p-3 whitespace-nowrap">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'HADIR TEPAT WAKTU'
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                     : p.checkInStatus === 'TERLAMBAT'
@@ -543,7 +591,7 @@ export function BimbinganPage() {
 
                           {targetStudentPresences.length === 0 && (
                             <tr>
-                              <td colSpan={5} className="p-6 text-center text-slate-400 text-xs">
+                              <td colSpan={6} className="p-6 text-center text-slate-400 text-xs">
                                 Belum ada riwayat presensi recorded.
                               </td>
                             </tr>
@@ -566,7 +614,7 @@ export function BimbinganPage() {
                         <div key={log.id} className="border border-slate-200 rounded-2xl p-4 space-y-2 bg-slate-50">
                           <div className="flex justify-between items-center border-b pb-2">
                             <span className="text-xs font-mono font-bold text-blue-700">{log.dateStr}</span>
-                            <span className="text-[10px] text-slate-400">Diperbarui: {new Date(log.updatedAt || Date.now()).toLocaleDateString('id-ID')}</span>
+                            <span className="text-[10px] text-slate-400">Diperbarui: {new Date(log.updatedAt || log.dateStr).toLocaleDateString('id-ID')}</span>
                           </div>
                           <div>
                             <p className="text-[11px] font-bold text-slate-700">🎯 Pencapaian:</p>

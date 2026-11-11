@@ -59,7 +59,7 @@ export function PresencePage({ setActiveTab }) {
   const isEarlyCheckoutTime = nowMinTotal < reqMinTotal;
 
   // Fallback Location Helper
-  const useFallbackLocation = () => {
+  const applyFallbackLocation = () => {
     const lat = settings.targetLat;
     const lon = settings.targetLon;
     setUserLocation({ lat, lon });
@@ -72,7 +72,7 @@ export function PresencePage({ setActiveTab }) {
   useEffect(() => {
     if (!navigator.geolocation) {
       setLocationError('Browser Anda tidak mendukung layanan Geolocation.');
-      useFallbackLocation();
+      applyFallbackLocation();
       return;
     }
 
@@ -100,7 +100,7 @@ export function PresencePage({ setActiveTab }) {
           msg = 'Fitur GPS HP dibatasi pada HTTP IP lokal. Silakan buka via Vercel HTTPS resmi atau gunakan simulasi target.';
         }
         setLocationError(msg);
-        useFallbackLocation();
+        applyFallbackLocation();
       },
       {
         enableHighAccuracy: true,

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { getLocalDateStr } from '../utils/date';
 import {
   Calendar, Clock, CheckCircle2, AlertTriangle,
   MapPin, Camera, BookOpen, ArrowRight, MessageSquare,
@@ -17,11 +18,11 @@ export function DashboardPage({ setActiveTab }) {
   const todayPresence = getTodayPresence();
   const todayLogbook = getTodayLogbook();
   const yesterdayLogbook = getYesterdayLogbook();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
 
   // Calculate Progress Days safely
-  const startDateStr = settings?.startDate || new Date().toISOString().split('T')[0];
-  const endDateStr = settings?.endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const startDateStr = settings?.startDate || getLocalDateStr();
+  const endDateStr = settings?.endDate || getLocalDateStr(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
 
   const parsedStart = new Date(startDateStr);
   const parsedEnd = new Date(endDateStr);
@@ -55,7 +56,7 @@ export function DashboardPage({ setActiveTab }) {
         stepCount++;
         const currTime = curr.getTime();
         if (isNaN(currTime)) break;
-        const currStr = curr.toISOString().split('T')[0];
+        const currStr = getLocalDateStr(curr);
         const dayName = dayNames[curr.getDay()];
         if (currStr !== todayStr && workDaysSet.has(dayName)) {
           const rec = logs.find((p) => p && p.dateStr === currStr);

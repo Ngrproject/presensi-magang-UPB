@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import {
   Users, UserPlus, ShieldCheck, MapPin, Unlock,
-  Calendar, Clock, Edit3, Trash2, CheckCircle2,
-  AlertTriangle, Search, Filter, BookOpen, UserCheck,
-  FileSpreadsheet, ShieldAlert, Sparkles, GraduationCap,
-  Image, Eye, X
+  Clock, Edit3, Trash2, CheckCircle2,
+  AlertTriangle, Search, BookOpen, UserCheck,
+  FileSpreadsheet, GraduationCap,
+  Image, Eye, X, Camera, Maximize2
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -21,6 +21,8 @@ export function AdminPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [previewLogbookPhoto, setPreviewLogbookPhoto] = useState(null);
+  const [selectedPresenceModal, setSelectedPresenceModal] = useState(null);
+  const [enlargedPhoto, setEnlargedPhoto] = useState(null);
 
   // Notification / Toast state
   const [notification, setNotification] = useState(null);
@@ -93,6 +95,7 @@ export function AdminPage() {
       (pres.studentId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (pres.dateStr || '').includes(searchTerm);
     const matchesStatus = statusFilter === 'ALL' ||
+      (statusFilter === 'WITH_PHOTO' && Boolean(pres.checkInPhoto || pres.checkOutPhoto || pres.proofPhoto)) ||
       pres.checkInStatus === statusFilter ||
       (statusFilter === 'IZIN' && pres.isLeave);
     return matchesSearch && matchesStatus;
@@ -115,7 +118,7 @@ export function AdminPage() {
       return;
     }
     try {
-      const targetUid = `user_${Date.now()}`;
+      const targetUid = `user_${new Date().getTime()}`;
       const targetRole = newUserForm.role || 'student';
       let assignedLecturerName = '';
       let assignedLecturerId = '';
@@ -222,7 +225,7 @@ export function AdminPage() {
       try {
         await adminDeleteUser(user.uid);
         showNotification(`User ${user.name} berhasil dihapus.`);
-      } catch (err) {
+      } catch {
         showNotification('Gagal menghapus user.', 'error');
       }
     }
@@ -233,7 +236,7 @@ export function AdminPage() {
     try {
       await adminUnlockStudentSettings(user.uid);
       showNotification(`🔓 Kunci Lokasi GPS untuk ${user.name} (${user.studentId}) telah DIBUKA. Mahasiswa dapat mengedit ulang lokasi GPS di halaman Instansi!`);
-    } catch (err) {
+    } catch {
       showNotification('Gagal membuka kunci lokasi.', 'error');
     }
   };
@@ -272,7 +275,7 @@ export function AdminPage() {
       else if (manualForm.mode === 'LEAVE') labelText = 'Ketidakhadiran';
 
       showNotification(`Absen ${labelText} untuk ${targetUser.name} (${manualForm.dateStr}) berhasil disimpan!`);
-    } catch (err) {
+    } catch {
       showNotification('Gagal menyimpan presensi manual.', 'error');
     }
   };
@@ -283,7 +286,7 @@ export function AdminPage() {
       try {
         await adminDeletePresence(pres.id);
         showNotification('Presensi berhasil dihapus.');
-      } catch (err) {
+      } catch {
         showNotification('Gagal menghapus presensi.', 'error');
       }
     }
@@ -435,6 +438,7 @@ export function AdminPage() {
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none"
           >
             <option value="ALL">Semua Status</option>
+            <option value="WITH_PHOTO">📸 Hanya yang Ada Foto</option>
             <option value="TEPAT WAKTU">Tepat Waktu</option>
             <option value="TERLAMBAT">Terlambat</option>
             <option value="IZIN">Izin / Sakit</option>
@@ -887,7 +891,9 @@ export function AdminPage() {
                 <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
                   <th className="p-4">Tanggal</th>
                   <th className="p-4">Mahasiswa</th>
+                  <th className="p-4 text-center">Foto Cek In</th>
                   <th className="p-4">Jam Masuk</th>
+                  <th className="p-4 text-center">Foto Cek Out</th>
                   <th className="p-4">Jam Keluar</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Aksi</th>
@@ -896,15 +902,119 @@ export function AdminPage() {
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-800">
                 {filteredPresences.map((pres) => (
                   <tr key={pres.id} className="hover:bg-slate-50/80 transition">
-                    <td className="p-4 font-mono text-slate-600 font-bold">{pres.dateStr}</td>
-                    <td className="p-4">
+                    <td className="p-4 font-mono text-slate-600 font-bold whitespace-nowrap">{pres.dateStr}</td>
+                    <td className="p-4 whitespace-nowrap">
                       <p className="font-bold text-slate-900">{pres.studentName}</p>
-                      <p className="text-[10px] text-blue-600 font-mono">NIM: {pres.studentId}</p>
+                      <p className="text-[10px] text-blue-600 font-mono font-semibold">NIM: {pres.studentId}</p>
                     </td>
-                    <td className="p-4 font-mono">{pres.checkInTime || '-'}</td>
-                    <td className="p-4 font-mono">{pres.checkOutTime || '-'}</td>
+
+                    {/* Foto Cek In */}
+                    <td className="p-4 text-center">
+                      {pres.isLeave ? (
+                        pres.proofPhoto ? (
+                          <div
+                            onClick={() => setEnlargedPhoto({
+                              url: pres.proofPhoto,
+                              title: `Surat Bukti Izin/Sakit - ${pres.studentName}`,
+                              subtitle: `NIM: ${pres.studentId} • Tanggal: ${pres.dateStr} • Jenis: ${pres.leaveType || 'IZIN'}${pres.reason ? ` • Alasan: ${pres.reason}` : ''}`
+                            })}
+                            className="relative w-12 h-12 mx-auto rounded-xl overflow-hidden border border-purple-200 cursor-pointer group shadow-xs bg-purple-950"
+                            title="Klik untuk memperbesar bukti izin"
+                          >
+                            <img src={pres.proofPhoto} alt="Bukti Izin" className="w-full h-full object-cover group-hover:scale-110 transition duration-200" />
+                            <div className="absolute inset-0 bg-purple-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                              <Eye className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="absolute bottom-0 inset-x-0 bg-purple-900/80 text-[8px] font-bold text-white py-0.5 text-center">
+                              Bukti
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                            Izin / Sakit
+                          </span>
+                        )
+                      ) : pres.checkInPhoto ? (
+                        <div
+                          onClick={() => setEnlargedPhoto({
+                            url: pres.checkInPhoto,
+                            title: `Foto Presensi Masuk (Check-In) - ${pres.studentName}`,
+                            subtitle: `NIM: ${pres.studentId} • Tanggal: ${pres.dateStr} • Pukul: ${pres.checkInTime || '-'} WIB • Status: ${pres.checkInStatus || '-'}${pres.checkInLocation?.distance !== undefined ? ` • Jarak GPS: ${Math.round(pres.checkInLocation.distance)}m` : ''}`
+                          })}
+                          className="relative w-12 h-12 mx-auto rounded-xl overflow-hidden border border-slate-200 cursor-pointer group shadow-xs bg-slate-900 hover:ring-2 hover:ring-blue-500 transition duration-200"
+                          title="Klik untuk memperbesar Foto Cek In"
+                        >
+                          <img src={pres.checkInPhoto} alt="Foto Cek In" className="w-full h-full object-cover group-hover:scale-110 transition duration-200" />
+                          <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <Eye className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 text-[10px]">
+                          <Camera className="w-4 h-4 text-slate-300 mb-0.5" />
+                          <span>Tanpa Foto</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Jam Masuk */}
+                    <td className="p-4 font-mono">
+                      <div className="font-bold text-slate-800">{pres.checkInTime || '-'}</div>
+                      {pres.checkInLocation?.distance !== undefined && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-sans text-slate-500 font-medium mt-0.5" title={`Koordinat: ${pres.checkInLocation.lat?.toFixed(5)}, ${pres.checkInLocation.lon?.toFixed(5)}`}>
+                          <MapPin className="w-3 h-3 text-emerald-600" />
+                          {Math.round(pres.checkInLocation.distance)}m
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Foto Cek Out */}
+                    <td className="p-4 text-center">
+                      {pres.isLeave ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                          Izin / Sakit
+                        </span>
+                      ) : pres.checkOutPhoto ? (
+                        <div
+                          onClick={() => setEnlargedPhoto({
+                            url: pres.checkOutPhoto,
+                            title: `Foto Presensi Pulang (Check-Out) - ${pres.studentName}`,
+                            subtitle: `NIM: ${pres.studentId} • Tanggal: ${pres.dateStr} • Pukul: ${pres.checkOutTime || '-'} WIB • Status: ${pres.checkOutStatus || 'SELESAI'}${pres.checkOutLocation?.distance !== undefined ? ` • Jarak GPS: ${Math.round(pres.checkOutLocation.distance)}m` : ''}`
+                          })}
+                          className="relative w-12 h-12 mx-auto rounded-xl overflow-hidden border border-slate-200 cursor-pointer group shadow-xs bg-slate-900 hover:ring-2 hover:ring-blue-500 transition duration-200"
+                          title="Klik untuk memperbesar Foto Cek Out"
+                        >
+                          <img src={pres.checkOutPhoto} alt="Foto Cek Out" className="w-full h-full object-cover group-hover:scale-110 transition duration-200" />
+                          <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <Eye className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                      ) : !pres.checkOutTime ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                          Belum Pulang
+                        </span>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 text-[10px]">
+                          <Camera className="w-4 h-4 text-slate-300 mb-0.5" />
+                          <span>Tanpa Foto</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Jam Keluar */}
+                    <td className="p-4 font-mono">
+                      <div className="font-bold text-slate-800">{pres.checkOutTime || '-'}</div>
+                      {pres.checkOutLocation?.distance !== undefined && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-sans text-slate-500 font-medium mt-0.5" title={`Koordinat: ${pres.checkOutLocation.lat?.toFixed(5)}, ${pres.checkOutLocation.lon?.toFixed(5)}`}>
+                          <MapPin className="w-3 h-3 text-emerald-600" />
+                          {Math.round(pres.checkOutLocation.distance)}m
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Status */}
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${pres.checkInStatus === 'TEPAT WAKTU' || pres.checkInStatus === 'HADIR TEPAT WAKTU' || pres.checkInStatus === 'HADIR'
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${pres.checkInStatus === 'TEPAT WAKTU' || pres.checkInStatus === 'HADIR TEPAT WAKTU' || pres.checkInStatus === 'HADIR'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : pres.checkInStatus === 'TERLAMBAT'
                           ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -915,10 +1025,20 @@ export function AdminPage() {
                         {pres.checkInStatus}
                       </span>
                     </td>
-                    <td className="p-4 text-right space-x-2">
+
+                    {/* Aksi */}
+                    <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedPresenceModal(pres)}
+                        className="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 transition inline-flex items-center gap-1 text-[11px] font-bold"
+                        title="Lihat Detail & Foto Cek In / Cek Out"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span className="hidden sm:inline">Foto</span>
+                      </button>
                       <button
                         onClick={() => handleDeletePresence(pres)}
-                        className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 transition"
+                        className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 transition inline-flex items-center"
                         title="Hapus Presensi"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -929,7 +1049,7 @@ export function AdminPage() {
 
                 {filteredPresences.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-400 text-xs">
+                    <td colSpan={8} className="p-8 text-center text-slate-400 text-xs">
                       Belum ada data presensi yang sesuai.
                     </td>
                   </tr>
@@ -1223,6 +1343,291 @@ export function AdminPage() {
               alt="Foto Progress Logbook"
               className="max-h-[80vh] w-auto object-contain rounded-2xl border-2 border-white/20 shadow-2xl"
             />
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DETAIL PRESENSI LENGKAP & FOTO CEK IN / CEK OUT */}
+      {selectedPresenceModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-blue-600" />
+                  <span>Foto & Verifikasi Presensi Mahasiswa</span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  <span className="font-bold text-slate-900">{selectedPresenceModal.studentName}</span>
+                  {' '}(NIM: <span className="font-mono text-blue-600 font-bold">{selectedPresenceModal.studentId}</span>)
+                  {' • '}Tanggal: <span className="font-mono font-bold text-slate-800">{selectedPresenceModal.dateStr}</span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPresenceModal(null)}
+                className="p-2 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                title="Tutup Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+
+              {selectedPresenceModal.isLeave ? (
+                /* LEAVE RECORD */
+                <div className="bg-purple-50/60 border border-purple-200 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-600 text-white uppercase tracking-wider">
+                      {selectedPresenceModal.leaveType || 'IZIN / SAKIT'}
+                    </span>
+                    <span className="text-xs text-purple-700 font-medium">Catatan Ketidakhadiran</span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold text-purple-900">Alasan / Keterangan:</p>
+                    <p className="text-xs text-purple-800 bg-white/80 p-3 rounded-xl border border-purple-200/80 mt-1 whitespace-pre-wrap">
+                      {selectedPresenceModal.reason || 'Tidak ada keterangan yang dilampirkan.'}
+                    </p>
+                  </div>
+
+                  {selectedPresenceModal.proofPhoto ? (
+                    <div>
+                      <p className="text-xs font-bold text-purple-900 mb-2">Dokumen / Foto Surat Bukti:</p>
+                      <div className="relative max-w-md mx-auto rounded-2xl overflow-hidden border border-purple-300 bg-slate-900 shadow-md group">
+                        <img
+                          src={selectedPresenceModal.proofPhoto}
+                          alt="Surat Bukti"
+                          className="w-full max-h-96 object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEnlargedPhoto({
+                            url: selectedPresenceModal.proofPhoto,
+                            title: `Surat Bukti Izin - ${selectedPresenceModal.studentName}`,
+                            subtitle: `Jenis: ${selectedPresenceModal.leaveType} • Tanggal: ${selectedPresenceModal.dateStr}${selectedPresenceModal.reason ? ` • Alasan: ${selectedPresenceModal.reason}` : ''}`
+                          })}
+                          className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 backdrop-blur-xs transition"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          <span>Perbesar Layar Penuh</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center bg-white/60 rounded-xl border border-purple-200 text-purple-600 text-xs font-medium">
+                      Mahasiswa tidak melampirkan berkas foto surat dokter/izin.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* REGULAR HADIR: CHECK IN & CHECK OUT COMPARISON */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                  {/* KARTU 1: PRESENSI MASUK (CHECK IN) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-4 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+                          <h4 className="text-sm font-black text-slate-900">Presensi Masuk (Check-In)</h4>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          selectedPresenceModal.checkInStatus === 'TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {selectedPresenceModal.checkInStatus || 'HADIR'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Waktu Masuk</span>
+                          <span className="font-mono font-bold text-slate-900 text-sm">{selectedPresenceModal.checkInTime || '-'} WIB</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Jarak GPS Target</span>
+                          <span className="font-mono font-bold text-emerald-700 text-sm">
+                            {selectedPresenceModal.checkInLocation?.distance !== undefined
+                              ? `${Math.round(selectedPresenceModal.checkInLocation.distance)} meter`
+                              : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Foto Selfie Check In */}
+                    <div className="mt-2">
+                      <p className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                        <span>Foto Selfie Masuk:</span>
+                        {selectedPresenceModal.checkInPhoto && (
+                          <span className="text-[11px] text-blue-600 font-medium">Terverifikasi Kamera</span>
+                        )}
+                      </p>
+
+                      {selectedPresenceModal.checkInPhoto ? (
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 aspect-4/3 shadow-xs group flex items-center justify-center">
+                          <img
+                            src={selectedPresenceModal.checkInPhoto}
+                            alt="Foto Selfie Cek In"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEnlargedPhoto({
+                              url: selectedPresenceModal.checkInPhoto,
+                              title: `Foto Presensi Masuk (Check-In) - ${selectedPresenceModal.studentName}`,
+                              subtitle: `Pukul: ${selectedPresenceModal.checkInTime || '-'} WIB • Status: ${selectedPresenceModal.checkInStatus || '-'}${selectedPresenceModal.checkInLocation?.distance !== undefined ? ` • Jarak GPS: ${Math.round(selectedPresenceModal.checkInLocation.distance)}m` : ''}`
+                            })}
+                            className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 backdrop-blur-xs transition"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            <span>Perbesar</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-8 text-center flex flex-col items-center justify-center aspect-4/3">
+                          <Camera className="w-8 h-8 text-slate-300 mb-2" />
+                          <p className="text-xs font-bold text-slate-600">Tidak Ada Foto Selfie Masuk</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Mungkin diinput secara manual oleh Admin.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* KARTU 2: PRESENSI PULANG (CHECK OUT) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-4 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${selectedPresenceModal.checkOutTime ? 'bg-blue-500' : 'bg-amber-400'}`} />
+                          <h4 className="text-sm font-black text-slate-900">Presensi Pulang (Check-Out)</h4>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          selectedPresenceModal.checkOutTime
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {selectedPresenceModal.checkOutStatus || (selectedPresenceModal.checkOutTime ? 'SELESAI' : 'BELUM PULANG')}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Waktu Pulang</span>
+                          <span className="font-mono font-bold text-slate-900 text-sm">{selectedPresenceModal.checkOutTime || 'Belum'}</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Jarak GPS Target</span>
+                          <span className="font-mono font-bold text-blue-700 text-sm">
+                            {selectedPresenceModal.checkOutLocation?.distance !== undefined
+                              ? `${Math.round(selectedPresenceModal.checkOutLocation.distance)} meter`
+                              : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Foto Selfie Check Out */}
+                    <div className="mt-2">
+                      <p className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                        <span>Foto Selfie Pulang:</span>
+                        {selectedPresenceModal.checkOutPhoto && (
+                          <span className="text-[11px] text-emerald-600 font-medium">Terverifikasi Kamera</span>
+                        )}
+                      </p>
+
+                      {selectedPresenceModal.checkOutPhoto ? (
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 aspect-4/3 shadow-xs group flex items-center justify-center">
+                          <img
+                            src={selectedPresenceModal.checkOutPhoto}
+                            alt="Foto Selfie Cek Out"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEnlargedPhoto({
+                              url: selectedPresenceModal.checkOutPhoto,
+                              title: `Foto Presensi Pulang (Check-Out) - ${selectedPresenceModal.studentName}`,
+                              subtitle: `Pukul: ${selectedPresenceModal.checkOutTime || '-'} WIB • Status: ${selectedPresenceModal.checkOutStatus || 'SELESAI'}${selectedPresenceModal.checkOutLocation?.distance !== undefined ? ` • Jarak GPS: ${Math.round(selectedPresenceModal.checkOutLocation.distance)}m` : ''}`
+                            })}
+                            className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 backdrop-blur-xs transition"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            <span>Perbesar</span>
+                          </button>
+                        </div>
+                      ) : !selectedPresenceModal.checkOutTime ? (
+                        <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-8 text-center flex flex-col items-center justify-center aspect-4/3">
+                          <Clock className="w-8 h-8 text-amber-500 mb-2" />
+                          <p className="text-xs font-bold text-amber-800">Belum Melakukan Cek Out</p>
+                          <p className="text-[10px] text-amber-600/80 mt-0.5">Mahasiswa belum menyelesaikan jam kerja hari ini.</p>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-8 text-center flex flex-col items-center justify-center aspect-4/3">
+                          <Camera className="w-8 h-8 text-slate-300 mb-2" />
+                          <p className="text-xs font-bold text-slate-600">Tidak Ada Foto Selfie Pulang</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Presensi kepulangan dicatat tanpa foto.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedPresenceModal(null)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 text-white hover:bg-slate-900 text-xs font-bold transition shadow-xs"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PREVIEW FOTO HIGH RESOLUTION */}
+      {enlargedPhoto && (
+        <div className="fixed inset-0 z-60 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-4xl w-full flex flex-col items-center">
+            
+            <div className="w-full flex items-center justify-between pb-3 text-white mb-2">
+              <div>
+                <h4 className="text-sm font-bold text-white">{enlargedPhoto.title}</h4>
+                {enlargedPhoto.subtitle && (
+                  <p className="text-xs text-slate-300 mt-0.5">{enlargedPhoto.subtitle}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnlargedPhoto(null)}
+                className="text-white hover:text-amber-400 font-bold text-xs flex items-center gap-1 bg-slate-800/80 px-3.5 py-2 rounded-full border border-white/20 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Tutup</span>
+              </button>
+            </div>
+
+            <div className="relative rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 max-h-[80vh] flex items-center justify-center">
+              <img
+                src={enlargedPhoto.url}
+                alt="Foto Absensi"
+                className="max-h-[80vh] w-auto object-contain rounded-2xl"
+              />
+            </div>
           </div>
         </div>
       )}

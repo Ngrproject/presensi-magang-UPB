@@ -11,7 +11,7 @@ import {
 
 export function DashboardPage({ setActiveTab }) {
   const { currentUser } = useAuth();
-  const { isDataLoading, settings, presenceLogs, logbooks, getTodayPresence, getTodayLogbook, getYesterdayLogbook } = useApp();
+  const { isDataLoading, isSyncing, settings, presenceLogs, logbooks, getTodayPresence, getTodayLogbook, getYesterdayLogbook } = useApp();
 
   const [previewModalPhoto, setPreviewModalPhoto] = useState(null);
 
@@ -180,11 +180,11 @@ export function DashboardPage({ setActiveTab }) {
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
             Rekapitulasi Kehadiran Magang
           </h3>
-          {isDataLoading && (
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-pulse">
-              ⚡ Menyinkronkan data server...
-            </span>
-          )}
+            { isSyncing && (
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-pulse">
+                ⚡ Menyinkronkan...
+              </span>
+            )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-1">

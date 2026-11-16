@@ -43,33 +43,10 @@ export function DashboardPage({ setActiveTab }) {
   const izinCount = logs.filter((p) => p && p.isLeave && p.leaveType === 'IZIN').length;
   const liburCount = logs.filter((p) => p && p.isLeave && (p.leaveType === 'LIBUR NASIONAL' || p.leaveType === 'LIBUR INSTANSI')).length;
 
-  // Calculate Alpha Count safely (Only after initial data load completes to avoid false Alpha spikes)
-  let alphaCount = 0;
-  if (!isDataLoading) {
-    const workDaysSet = new Set(settings?.workDays || ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
-    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
-    try {
-      let curr = new Date(start);
-      let stepCount = 0;
-      while (curr < now && stepCount < 365) {
-        stepCount++;
-        const currTime = curr.getTime();
-        if (isNaN(currTime)) break;
-        const currStr = getLocalDateStr(curr);
-        const dayName = dayNames[curr.getDay()];
-        if (currStr !== todayStr && workDaysSet.has(dayName)) {
-          const rec = logs.find((p) => p && p.dateStr === currStr);
-          if (!rec) {
-            alphaCount++;
-          }
-        }
-        curr.setDate(curr.getDate() + 1);
-      }
-    } catch (err) {
-      console.error("Alpha count calculation safely handled:", err);
-    }
-  }
+    // Calculate Alpha Count safely from actual presence records
+    const alphaCount = logs.filter(
+      (p) => p && (p.checkInStatus === 'ALPA' || p.checkInStatus === 'ALPHA' || (p.isLeave && (p.leaveType === 'ALPA' || p.leaveType === 'ALPHA')))
+    ).length;
 
   const getStatusBadge = (log) => {
     if (!log) return null;
@@ -180,11 +157,11 @@ export function DashboardPage({ setActiveTab }) {
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
             Rekapitulasi Kehadiran Magang
           </h3>
-            { isSyncing && (
-              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-pulse">
-                ⚡ Menyinkronkan...
-              </span>
-            )}
+          {isSyncing && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-pulse">
+              ⚡ Menyinkronkan...
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-1">

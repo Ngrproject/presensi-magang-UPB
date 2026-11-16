@@ -65,8 +65,8 @@ export function AdminPage() {
 
   const existingPresenceForForm = manualForm.userId
     ? (allPresenceLogs || []).find(
-        p => p.userId && p.userId === manualForm.userId && p.dateStr === manualForm.dateStr
-      )
+      p => p.userId && p.userId === manualForm.userId && p.dateStr === manualForm.dateStr
+    )
     : null;
 
   const todayStr = getTodayStr();
@@ -77,7 +77,7 @@ export function AdminPage() {
   const countHadir = todayPresences.filter(p => p.checkInStatus === 'TEPAT WAKTU' || p.checkInStatus === 'HADIR TEPAT WAKTU' || p.checkInStatus === 'HADIR').length;
   const countTerlambat = todayPresences.filter(p => p.checkInStatus === 'TERLAMBAT').length;
   const countIzin = todayPresences.filter(p => p.isLeave || p.checkInStatus === 'IZIN' || p.checkInStatus === 'SAKIT').length;
-  const countAlpa = todayPresences.filter(p => p.checkInStatus === 'ALPA').length;
+  const countAlpa = todayPresences.filter(p => p.checkInStatus === 'ALPA' || p.checkInStatus === 'ALPHA' || (p.isLeave && (p.leaveType === 'ALPA' || p.leaveType === 'ALPHA'))).length;
 
   // Filtered Users
   const filteredUsers = allUsers.filter(user => {
@@ -570,11 +570,10 @@ export function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setManualForm({ ...manualForm, mode: 'CHECKIN_ONLY', isLeave: false })}
-                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
-                    manualForm.mode === 'CHECKIN_ONLY'
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${manualForm.mode === 'CHECKIN_ONLY'
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <Clock className="w-4 h-4" />
                   <span>Check-In Saja</span>
@@ -583,11 +582,10 @@ export function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setManualForm({ ...manualForm, mode: 'CHECKOUT_ONLY', isLeave: false })}
-                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
-                    manualForm.mode === 'CHECKOUT_ONLY'
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${manualForm.mode === 'CHECKOUT_ONLY'
                       ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <Clock className="w-4 h-4" />
                   <span>Check-Out Saja</span>
@@ -596,11 +594,10 @@ export function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setManualForm({ ...manualForm, mode: 'BOTH', isLeave: false })}
-                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
-                    manualForm.mode === 'BOTH'
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${manualForm.mode === 'BOTH'
                       ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>Dua-Duanya</span>
@@ -609,11 +606,10 @@ export function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setManualForm({ ...manualForm, mode: 'LEAVE', isLeave: true, leaveType: manualForm.leaveType || 'IZIN' })}
-                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${
-                    manualForm.mode === 'LEAVE'
+                  className={`p-3 rounded-2xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition ${manualForm.mode === 'LEAVE'
                       ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/20'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <AlertTriangle className="w-4 h-4" />
                   <span>Izin / Sakit</span>
@@ -855,15 +851,14 @@ export function AdminPage() {
 
             <button
               type="submit"
-              className={`w-full py-3.5 rounded-2xl text-white font-black text-xs shadow-lg transition transform active:scale-98 border border-white/20 ${
-                manualForm.mode === 'CHECKIN_ONLY'
+              className={`w-full py-3.5 rounded-2xl text-white font-black text-xs shadow-lg transition transform active:scale-98 border border-white/20 ${manualForm.mode === 'CHECKIN_ONLY'
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-500/20'
                   : manualForm.mode === 'CHECKOUT_ONLY'
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 shadow-amber-500/20'
-                  : manualForm.mode === 'LEAVE'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-purple-500/20'
-                  : 'bg-gradient-to-r from-blue-600 to-sky-600 shadow-blue-500/20'
-              }`}
+                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 shadow-amber-500/20'
+                    : manualForm.mode === 'LEAVE'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-purple-500/20'
+                      : 'bg-gradient-to-r from-blue-600 to-sky-600 shadow-blue-500/20'
+                }`}
             >
               {manualForm.mode === 'CHECKIN_ONLY' && 'SIMPAN ABSEN CHECK-IN MAHASISWA'}
               {manualForm.mode === 'CHECKOUT_ONLY' && 'SIMPAN ABSEN CHECK-OUT MAHASISWA'}
@@ -1351,7 +1346,7 @@ export function AdminPage() {
       {selectedPresenceModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
+
             {/* Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
               <div>
@@ -1437,11 +1432,10 @@ export function AdminPage() {
                           <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
                           <h4 className="text-sm font-black text-slate-900">Presensi Masuk (Check-In)</h4>
                         </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          selectedPresenceModal.checkInStatus === 'TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${selectedPresenceModal.checkInStatus === 'TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR TEPAT WAKTU' || selectedPresenceModal.checkInStatus === 'HADIR'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
+                          }`}>
                           {selectedPresenceModal.checkInStatus || 'HADIR'}
                         </span>
                       </div>
@@ -1509,11 +1503,10 @@ export function AdminPage() {
                           <span className={`w-3 h-3 rounded-full ${selectedPresenceModal.checkOutTime ? 'bg-blue-500' : 'bg-amber-400'}`} />
                           <h4 className="text-sm font-black text-slate-900">Presensi Pulang (Check-Out)</h4>
                         </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          selectedPresenceModal.checkOutTime
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${selectedPresenceModal.checkOutTime
                             ? 'bg-blue-50 text-blue-700 border-blue-200'
                             : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
+                          }`}>
                           {selectedPresenceModal.checkOutStatus || (selectedPresenceModal.checkOutTime ? 'SELESAI' : 'BELUM PULANG')}
                         </span>
                       </div>
@@ -1603,7 +1596,7 @@ export function AdminPage() {
       {enlargedPhoto && (
         <div className="fixed inset-0 z-60 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="relative max-w-4xl w-full flex flex-col items-center">
-            
+
             <div className="w-full flex items-center justify-between pb-3 text-white mb-2">
               <div>
                 <h4 className="text-sm font-bold text-white">{enlargedPhoto.title}</h4>

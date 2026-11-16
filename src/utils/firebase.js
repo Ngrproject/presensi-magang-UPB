@@ -1,6 +1,12 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, serverTimestamp } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  serverTimestamp
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -25,9 +31,18 @@ let storage = null;
 
 if (isFirebaseConfigured) {
   try {
-    app = initializeApp(firebaseConfig);
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app);
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      });
+    } catch {
+      // In case Firestore was already initialized or persistent cache isn't supported in environment
+      db = getFirestore(app);
+    }
     storage = getStorage(app);
   } catch (err) {
     console.warn("Firebase initialization failed, switching to Local Mock Mode:", err);

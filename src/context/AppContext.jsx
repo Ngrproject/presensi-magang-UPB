@@ -49,18 +49,20 @@ export function AppProvider({ children }) {
 
   const settingsKey = `settings_${userId}`;
   const presenceKey = `presence_${userId}`;
+  const todayKey = `today_presence_${userId}`;
   const logbooksKey = `logbooks_${userId}`;
+  const todayLogbookKey = `today_logbook_${userId}`;
   const auditLogsKey = `audit_logs_${userId}`;
 
   // Cache-First: If user already has cached settings in localStorage, app is ready instantly (0ms)
   const [isDataLoading, setIsDataLoading] = useState(() => {
     if (!userId || userId === 'guest') return false;
-    return !localStorage.getItem(settingsKey);
+    return !localStorage.getItem(settingsKey) && !localStorage.getItem('last_known_settings');
   });
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem(settingsKey);
+    const saved = localStorage.getItem(settingsKey) || localStorage.getItem('last_known_settings');
     const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
     return {
       ...DEFAULT_SETTINGS,
@@ -78,6 +80,46 @@ export function AppProvider({ children }) {
         checkOutStart: parsed?.workHours?.checkOutStart || '16:00'
       }
     };
+  });
+
+  const [todayPresence, setTodayPresence] = useState(() => {
+    const today = getLocalDateStr();
+    const savedToday = localStorage.getItem(todayKey);
+    if (savedToday) {
+      try {
+        const parsed = JSON.parse(savedToday);
+        if (parsed?.dateStr === today) return parsed;
+      } catch (e) { }
+    }
+    const savedPres = localStorage.getItem(presenceKey);
+    if (savedPres) {
+      try {
+        const list = JSON.parse(savedPres);
+        const found = list.find((p) => p.dateStr === today);
+        if (found) return found;
+      } catch (e) { }
+    }
+    return null;
+  });
+
+  const [todayLogbook, setTodayLogbookState] = useState(() => {
+    const today = getLocalDateStr();
+    const savedToday = localStorage.getItem(todayLogbookKey);
+    if (savedToday) {
+      try {
+        const parsed = JSON.parse(savedToday);
+        if (parsed?.dateStr === today) return parsed;
+      } catch (e) { }
+    }
+    const savedLog = localStorage.getItem(logbooksKey);
+    if (savedLog) {
+      try {
+        const list = JSON.parse(savedLog);
+        const found = list.find((l) => l.dateStr === today);
+        if (found) return found;
+      } catch (e) { }
+    }
+    return null;
   });
 
   const [presenceLogs, setPresenceLogs] = useState(() => {
@@ -164,16 +206,26 @@ export function AppProvider({ children }) {
   // Real-time Firestore sync listeners for individual user context
   useEffect(() => {
     if (!userId || userId === 'guest') {
-      setSettings(DEFAULT_SETTINGS);
+      const fallbackSet = localStorage.getItem('last_known_settings');
+      if (fallbackSet) {
+        try {
+          const parsed = JSON.parse(fallbackSet);
+          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+        } catch (e) { }
+      } else {
+        setSettings(DEFAULT_SETTINGS);
+      }
       setPresenceLogs([]);
+      setTodayPresence(null);
       setLogbooks([]);
+      setTodayLogbookState(null);
       setAuditLogs([]);
       setIsDataLoading(false);
       setIsSyncing(false);
       return;
     }
 
-    const savedSet = localStorage.getItem(settingsKey);
+    const savedSet = localStorage.getItem(settingsKey) || localStorage.getItem('last_known_settings');
     // If cached settings exist, don't show blocking loading state!
     if (!savedSet) {
       setIsDataLoading(true);
@@ -201,14 +253,53 @@ export function AppProvider({ children }) {
       } catch (e) { }
     }
 
+    const todayStr = getLocalDateStr();
+    const savedToday = localStorage.getItem(todayKey);
+    if (savedToday) {
+      try {
+        const parsed = JSON.parse(savedToday);
+        if (parsed?.dateStr === todayStr) {
+          setTodayPresence(parsed);
+        } else {
+          setTodayPresence(null);
+        }
+      } catch (e) { }
+    }
+
+    const savedTodayLog = localStorage.getItem(todayLogbookKey);
+    if (savedTodayLog) {
+      try {
+        const parsed = JSON.parse(savedTodayLog);
+        if (parsed?.dateStr === todayStr) {
+          setTodayLogbookState(parsed);
+        } else {
+          setTodayLogbookState(null);
+        }
+      } catch (e) { }
+    }
+
     const savedPres = localStorage.getItem(presenceKey);
     if (savedPres) {
-      try { setPresenceLogs(JSON.parse(savedPres)); } catch (e) { }
+      try {
+        const list = JSON.parse(savedPres);
+        setPresenceLogs(list);
+        if (!savedToday) {
+          const found = list.find((p) => p.dateStr === todayStr);
+          if (found) setTodayPresence(found);
+        }
+      } catch (e) { }
     }
 
     const savedLog = localStorage.getItem(logbooksKey);
     if (savedLog) {
-      try { setLogbooks(JSON.parse(savedLog)); } catch (e) { }
+      try {
+        const list = JSON.parse(savedLog);
+        setLogbooks(list);
+        if (!savedTodayLog) {
+          const found = list.find((l) => l.dateStr === todayStr);
+          if (found) setTodayLogbookState(found);
+        }
+      } catch (e) { }
     }
 
     const savedAudit = localStorage.getItem(auditLogsKey);
@@ -217,114 +308,192 @@ export function AppProvider({ children }) {
     }
 
     if (isFirebaseConfigured && db) {
-      let settingsLoaded = false;
-      let presencesLoaded = false;
+      let settingsLoaded = Boolean(savedSet);
+      let todayPresLoaded = Boolean(savedToday);
 
       const checkLoaded = () => {
-        if (settingsLoaded && presencesLoaded) {
-          setIsDataLoading(false);
-          setIsSyncing(false);
-        }
-      };
+          if (settingsLoaded) {
+            setIsDataLoading(false);
+            setIsSyncing(false);
+          }
+        };
 
-      const settingsRef = doc(db, 'settings', userId);
-      const unsubSettings = onSnapshot(settingsRef, (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          const merged = {
-            ...DEFAULT_SETTINGS,
-            ...data,
-            shifts: {
-              ...DEFAULT_SETTINGS.shifts,
-              ...(data?.shifts || {})
-            },
-            dailyHours: {
-              ...DEFAULT_SETTINGS.dailyHours,
-              ...(data?.dailyHours || {})
-            },
-            workHours: {
-              checkInStart: data?.workHours?.checkInStart || '08:00',
-              checkOutStart: data?.workHours?.checkOutStart || '16:00'
-            }
-          };
-          setSettings(merged);
-          try {
-            localStorage.setItem(settingsKey, JSON.stringify(merged));
-          } catch (e) { }
-        }
-        settingsLoaded = true;
-        checkLoaded();
-      }, (err) => {
-        console.log('Firestore settings listener info:', err);
-        settingsLoaded = true;
-        checkLoaded();
-      });
-
-      const presencesRef = collection(db, 'presences');
-      const qPres = query(presencesRef, where('userId', '==', userId));
-      const unsubPresences = onSnapshot(qPres, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
+        const settingsRef = doc(db, 'settings', userId);
+        const unsubSettings = onSnapshot(settingsRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const merged = {
+              ...DEFAULT_SETTINGS,
+              ...data,
+              shifts: {
+                ...DEFAULT_SETTINGS.shifts,
+                ...(data?.shifts || {})
+              },
+              dailyHours: {
+                ...DEFAULT_SETTINGS.dailyHours,
+                ...(data?.dailyHours || {})
+              },
+              workHours: {
+                checkInStart: data?.workHours?.checkInStart || '08:00',
+                checkOutStart: data?.workHours?.checkOutStart || '16:00'
+              }
+            };
+            setSettings(merged);
+            try {
+              localStorage.setItem(settingsKey, JSON.stringify(merged));
+              localStorage.setItem('last_known_settings', JSON.stringify(merged));
+            } catch (e) { }
+          }
+          settingsLoaded = true;
+          checkLoaded();
+        }, (err) => {
+          console.log('Firestore settings listener info:', err);
+          settingsLoaded = true;
+          checkLoaded();
         });
-        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
-        setPresenceLogs(list);
-        try {
-          localStorage.setItem(presenceKey, JSON.stringify(list));
-        } catch (e) { }
-        presencesLoaded = true;
+
+        // 1. FAST SINGLE-DOC TODAY PRESENCE LISTENER
+        // Reads only 1 single document (`pres_${userId}_${todayStr}`) instead of downloading MBs of history!
+        const todayPresDocRef = doc(db, 'presences', `pres_${userId}_${todayStr}`);
+        const unsubTodayPres = onSnapshot(todayPresDocRef, (snap) => {
+          if (snap.exists()) {
+            const data = { id: snap.id, ...snap.data() };
+            setTodayPresence(data);
+            try {
+              localStorage.setItem(todayKey, JSON.stringify(data));
+            } catch (e) { }
+            setPresenceLogs((prev) => {
+              const idx = prev.findIndex((p) => p.dateStr === todayStr);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = data;
+                return copy;
+              }
+              return [data, ...prev];
+            });
+          }
+          todayPresLoaded = true;
+          checkLoaded();
+        }, (err) => {
+          console.log('Firestore today presence info:', err);
+          todayPresLoaded = true;
+          checkLoaded();
+        });
+
+        // 2. BACKGROUND HISTORICAL PRESENCES LISTENER
+        const presencesRef = collection(db, 'presences');
+        const qPres = query(presencesRef, where('userId', '==', userId));
+        const unsubPresences = onSnapshot(qPres, (snap) => {
+          const list = [];
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+          setPresenceLogs(list);
+
+          const currentToday = list.find((p) => p.dateStr === todayStr);
+          if (currentToday) {
+            setTodayPresence(currentToday);
+            try {
+              localStorage.setItem(todayKey, JSON.stringify(currentToday));
+            } catch (e) { }
+          }
+
+          try {
+          // Strip heavy photos from older presences so localStorage never exceeds 5MB quota
+          const lightList = list.map((item) => {
+            if (item.dateStr === todayStr) return item;
+            const { checkInPhoto, checkOutPhoto, proofPhoto, ...light } = item;
+            return light;
+          });
+          localStorage.setItem(presenceKey, JSON.stringify(lightList));
+        } catch (e) {
+          console.warn('Quota exceeded for presenceKey, falling back', e);
+        }
+        todayPresLoaded = true;
         checkLoaded();
       }, (err) => {
         console.log('Firestore presences listener info:', err);
-        presencesLoaded = true;
+        todayPresLoaded = true;
         checkLoaded();
       });
 
-      const logbooksRef = collection(db, 'logbooks');
-      const qLog = query(logbooksRef, where('userId', '==', userId));
-      const unsubLogbooks = onSnapshot(qLog, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
-        setLogbooks(list);
-        try {
-          localStorage.setItem(logbooksKey, JSON.stringify(list));
-        } catch (e) { }
-      }, (err) => console.log('Firestore logbooks listener info:', err));
+  // 3. FAST SINGLE-DOC TODAY LOGBOOK LISTENER
+  const todayLogDocRef = doc(db, 'logbooks', `log_${userId}_${todayStr}`);
+  const unsubTodayLog = onSnapshot(todayLogDocRef, (snap) => {
+    if (snap.exists()) {
+      const data = { id: snap.id, ...snap.data() };
+      setTodayLogbookState(data);
+      try {
+        localStorage.setItem(todayLogbookKey, JSON.stringify(data));
+      } catch (e) { }
+    }
+  }, (err) => console.log('Firestore today logbook info:', err));
 
-      const auditRef = collection(db, 'audit_logs');
-      const qAudit = query(auditRef, where('userId', '==', userId));
-      const unsubAudit = onSnapshot(qAudit, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-        setAuditLogs(list);
-        try {
-          localStorage.setItem(auditLogsKey, JSON.stringify(list));
-        } catch (e) { }
-      }, (err) => console.log('Firestore audit listener info:', err));
+  // 4. BACKGROUND HISTORICAL LOGBOOKS LISTENER
+  const logbooksRef = collection(db, 'logbooks');
+  const qLog = query(logbooksRef, where('userId', '==', userId));
+  const unsubLogbooks = onSnapshot(qLog, (snap) => {
+    const list = [];
+    snap.forEach((docSnap) => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    list.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+    setLogbooks(list);
 
-      // Quick fallback timeout to ensure UI is interactive even on slow network
-      const timeoutId = setTimeout(() => {
-        setIsDataLoading(false);
-      setIsSyncing(false);
-    }, 1000);
+    const currentTodayLog = list.find((l) => l.dateStr === todayStr);
+    if (currentTodayLog) {
+      setTodayLogbookState(currentTodayLog);
+      try {
+        localStorage.setItem(todayLogbookKey, JSON.stringify(currentTodayLog));
+      } catch (e) { }
+    }
 
-  return () => {
-    clearTimeout(timeoutId);
-    unsubSettings();
-    unsubPresences();
-    unsubLogbooks();
-    unsubAudit();
-  };
-} else {
+    try {
+    const lightLogs = list.map((item) => {
+      if (item.dateStr === todayStr) return item;
+      const { progressPhoto, ...light } = item;
+      return light;
+    });
+    localStorage.setItem(logbooksKey, JSON.stringify(lightLogs));
+  } catch (e) {
+    console.warn('Quota exceeded for logbooksKey, falling back', e);
+  }
+}, (err) => console.log('Firestore logbooks listener info:', err));
+
+const auditRef = collection(db, 'audit_logs');
+const qAudit = query(auditRef, where('userId', '==', userId));
+const unsubAudit = onSnapshot(qAudit, (snap) => {
+  const list = [];
+  snap.forEach((docSnap) => {
+    list.push({ id: docSnap.id, ...docSnap.data() });
+  });
+  list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+  setAuditLogs(list);
+  try {
+    localStorage.setItem(auditLogsKey, JSON.stringify(list));
+  } catch (e) { }
+}, (err) => console.log('Firestore audit listener info:', err));
+
+// Quick fallback timeout to ensure UI is interactive even on slow network
+const timeoutId = setTimeout(() => {
   setIsDataLoading(false);
   setIsSyncing(false);
-}
+}, 600);
+
+return () => {
+  clearTimeout(timeoutId);
+  unsubSettings();
+  unsubTodayPres();
+  unsubPresences();
+  unsubTodayLog();
+  unsubLogbooks();
+  unsubAudit();
+};
+    } else {
+  setIsDataLoading(false);
+  setIsSyncing(false);
+    }
   }, [userId]);
 
 // Real-time Firestore sync listeners for global collections (ADMIN & LECTURER ONLY)
@@ -455,17 +624,23 @@ useEffect(() => {
       unsubCustomGroups();
     };
   }
-  }, [currentUser?.role]);
+}, [currentUser?.role]);
 
 const getTodayStr = () => getLocalDateStr(new Date());
 
 const getTodayPresence = () => {
   const today = getTodayStr();
+  if (todayPresence && todayPresence.dateStr === today) {
+    return todayPresence;
+  }
   return presenceLogs.find((p) => p.dateStr === today) || null;
 };
 
 const getTodayLogbook = () => {
   const today = getTodayStr();
+  if (todayLogbook && todayLogbook.dateStr === today) {
+    return todayLogbook;
+  }
   return logbooks.find((l) => l.dateStr === today) || null;
 };
 
@@ -596,6 +771,11 @@ const addCheckIn = async ({ photoDataUrl, userLat, userLon, distance }) => {
     checkOutStatus: existingToday?.checkOutStatus || null
   };
 
+  setTodayPresence(newRecord);
+  try {
+    localStorage.setItem(todayKey, JSON.stringify(newRecord));
+  } catch (e) { }
+
   setPresenceLogs((prev) => {
     const idx = prev.findIndex((p) => p.dateStr === todayStr);
     if (idx >= 0) {
@@ -665,6 +845,11 @@ const addCheckOut = async ({ photoDataUrl, userLat, userLon, distance }) => {
     checkOutStatus: 'SELESAI'
   };
 
+  setTodayPresence(updatedRecord);
+  try {
+    localStorage.setItem(todayKey, JSON.stringify(updatedRecord));
+  } catch (e) { }
+
   setPresenceLogs((prev) =>
     prev.map((item) => (item.dateStr === todayStr ? updatedRecord : item))
   );
@@ -703,6 +888,13 @@ const addLeaveRecord = async ({ leaveType, reason, proofDataUrl, dateStr = getTo
     submittedAt: new Date().toISOString()
   };
 
+  if (dateStr === getTodayStr()) {
+    setTodayPresence(leaveRecord);
+    try {
+      localStorage.setItem(todayKey, JSON.stringify(leaveRecord));
+    } catch (e) { }
+  }
+
   setPresenceLogs((prev) => {
     const idx = prev.findIndex((p) => p.dateStr === dateStr);
     if (idx >= 0) {
@@ -740,6 +932,13 @@ const saveLogbook = async ({ achievements, obstacles, tomorrowPlan, progressPhot
     updatedAt: nowIso,
     createdAt: existing?.createdAt || nowIso
   };
+
+  if (dateStr === getTodayStr()) {
+    setTodayLogbookState(logEntry);
+    try {
+      localStorage.setItem(todayLogbookKey, JSON.stringify(logEntry));
+    } catch (e) { }
+  }
 
   setLogbooks((prev) => {
     const idx = prev.findIndex((l) => l.dateStr === dateStr);
@@ -933,8 +1132,7 @@ const adminDeletePresence = async (recordId) => {
 
   if (isFirebaseConfigured && db) {
     try {
-      const { deleteDoc: deleteFsDoc } = await import('firebase/firestore');
-      await deleteFsDoc(doc(db, 'presences', recordId));
+      await deleteDoc(doc(db, 'presences', recordId));
     } catch (err) {
       console.error("Firestore adminDeletePresence error:", err);
     }
@@ -1288,6 +1486,8 @@ return (
       studentChats,
       groupMessages,
       customGroups,
+      todayPresence,
+      todayLogbook,
       getTodayPresence,
       getTodayLogbook,
       getYesterdayLogbook,
